@@ -5,7 +5,9 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @AllArgsConstructor
@@ -24,10 +26,10 @@ public class Movie {
     private LocalDate releaseDate;
 
 
-    @ElementCollection
+    @ElementCollection(fetch = FetchType.EAGER)
     @Enumerated(EnumType.STRING)
-    private List<Genre> genres;
+    private Set<Genre> genres = new HashSet<>();
 
-    @OneToMany(mappedBy = "movie",fetch = FetchType.LAZY)
-    private List<Show> shows;
+//    @OneToMany(mappedBy = "movie",fetch = FetchType.LAZY)
+//    private List<Show> shows;
 }

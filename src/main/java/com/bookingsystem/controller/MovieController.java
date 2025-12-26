@@ -4,6 +4,7 @@ import com.bookingsystem.dto.MovieRequestDto;
 import com.bookingsystem.dto.MovieResponseDto;
 import com.bookingsystem.entity.enums.Genre;
 import com.bookingsystem.service.MovieService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,7 +20,7 @@ public class MovieController {
     private final MovieService movieService;
 
     @PostMapping("/add-movie")
-    public ResponseEntity<MovieResponseDto> addMovie(@RequestBody MovieRequestDto movieRequestDto) {
+    public ResponseEntity<MovieResponseDto> addMovie(@Valid @RequestBody MovieRequestDto movieRequestDto) {
         MovieResponseDto response = movieService.addMovie(movieRequestDto);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }

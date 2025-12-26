@@ -4,6 +4,8 @@ import com.bookingsystem.dto.MovieRequestDto;
 import com.bookingsystem.dto.MovieResponseDto;
 import com.bookingsystem.entity.Movie;
 import com.bookingsystem.entity.enums.Genre;
+import com.bookingsystem.exception.InvalidRequestException;
+import com.bookingsystem.exception.ResourceNotFoundException;
 import com.bookingsystem.repository.MovieRepository;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
@@ -19,9 +21,16 @@ public class MovieServiceImpl implements MovieService{
 
     @Override
     public MovieResponseDto addMovie(MovieRequestDto movieRequestDto) {
+        movieRepository.findByNameIgnoreCase(movieRequestDto.getName())
+                .ifPresent(movie -> {
+                    throw new InvalidRequestException(
+                            "Movie already exists with name: " + movieRequestDto.getName()
+                    );
+                });
         Movie movie = modelMapper.map(movieRequestDto, Movie.class);
         Movie savedMovie = movieRepository.save(movie);
         return modelMapper.map(savedMovie, MovieResponseDto.class);
+
     }
 
     @Override
@@ -35,14 +44,19 @@ public class MovieServiceImpl implements MovieService{
     @Override
     public MovieResponseDto getMovieById(Long id) {
         Movie movie = movieRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Movie not found with id: " + id));
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Movie not found with id: " + id)
+                );
         return modelMapper.map(movie, MovieResponseDto.class);
     }
 
     @Override
     public MovieResponseDto getMovieByExactTitle(String title) {
         Movie movie = movieRepository.findByNameIgnoreCase(title)
-                .orElseThrow(() -> new RuntimeException("Movie not found with title: " + title));
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Movie not found with title: " + title)
+                );
+
         return modelMapper.map(movie, MovieResponseDto.class);
     }
 
@@ -64,23 +78,42 @@ public class MovieServiceImpl implements MovieService{
 
     @Override
     public MovieResponseDto updateMovie(Long id, MovieRequestDto movieRequestDto) {
-        Movie existingMovie = movieRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Movie not found with id: " + id));
-        existingMovie.setName(movieRequestDto.getName());
-        existingMovie.setDescription(movieRequestDto.getDescription());
-        existingMovie.setDuration(movieRequestDto.getDuration());
-        existingMovie.setLanguage(movieRequestDto.getLanguage());
-        existingMovie.setReleaseDate(movieRequestDto.getReleaseDate());
-        existingMovie.setGenres(movieRequestDto.getGenres());
 
+        Movie existingMovie = movieRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Movie not found with id: " + id)
+                );
+        if (movieRequestDto.getName() != null) {
+            existingMovie.setName(movieRequestDto.getName());
+        }
+        if (movieRequestDto.getDescription() != null) {
+            existingMovie.setDescription(movieRequestDto.getDescription());
+        }
+        if (movieRequestDto.getDuration() != null) {
+            existingMovie.setDuration(movieRequestDto.getDuration());
+        }
+        if (movieRequestDto.getLanguage() != null) {
+            existingMovie.setLanguage(movieRequestDto.getLanguage());
+        }
+        if (movieRequestDto.getReleaseDate() != null) {
+            existingMovie.setReleaseDate(movieRequestDto.getReleaseDate());
+        }
+        if (movieRequestDto.getGenres() != null) {
+            existingMovie.getGenres().clear();
+            existingMovie.getGenres().addAll(movieRequestDto.getGenres());
+        }
         Movie updatedMovie = movieRepository.save(existingMovie);
         return modelMapper.map(updatedMovie, MovieResponseDto.class);
     }
 
+
     @Override
     public void deleteMovie(Long id) {
         Movie movie = movieRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Movie not found with id: " + id));
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Movie not found with id: " + id)
+                );
+
         movieRepository.delete(movie);
     }
 }
