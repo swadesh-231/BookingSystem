@@ -18,18 +18,17 @@ import java.util.Set;
 public class Movie {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Long movieId;
     private String name;
     private String description;
     private Integer duration;
     private String language;
     private LocalDate releaseDate;
 
-
     @ElementCollection(fetch = FetchType.EAGER)
     @Enumerated(EnumType.STRING)
     private Set<Genre> genres = new HashSet<>();
 
-//    @OneToMany(mappedBy = "movie",fetch = FetchType.LAZY)
-//    private List<Show> shows;
+    @OneToMany(mappedBy = "movie",fetch = FetchType.LAZY)
+    private List<Show> shows;
 }

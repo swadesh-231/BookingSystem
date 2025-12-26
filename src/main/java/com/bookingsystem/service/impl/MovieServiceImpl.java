@@ -1,4 +1,4 @@
-package com.bookingsystem.service;
+package com.bookingsystem.service.impl;
 
 import com.bookingsystem.dto.MovieRequestDto;
 import com.bookingsystem.dto.MovieResponseDto;
@@ -7,6 +7,7 @@ import com.bookingsystem.entity.enums.Genre;
 import com.bookingsystem.exception.InvalidRequestException;
 import com.bookingsystem.exception.ResourceNotFoundException;
 import com.bookingsystem.repository.MovieRepository;
+import com.bookingsystem.service.MovieService;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
@@ -15,7 +16,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class MovieServiceImpl implements MovieService{
+public class MovieServiceImpl implements MovieService {
     private final MovieRepository movieRepository;
     private final ModelMapper modelMapper;
 
