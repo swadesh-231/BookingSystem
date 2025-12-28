@@ -20,6 +20,7 @@ public class Movie {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long movieId;
     private String name;
+    @Lob
     private String description;
     private Integer duration;
     private String language;

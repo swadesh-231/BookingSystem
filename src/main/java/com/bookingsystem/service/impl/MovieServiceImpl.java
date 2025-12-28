@@ -11,6 +11,7 @@ import com.bookingsystem.service.MovieService;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -52,6 +53,7 @@ public class MovieServiceImpl implements MovieService {
     }
 
     @Override
+    @Transactional
     public MovieResponseDto getMovieByExactTitle(String title) {
         Movie movie = movieRepository.findByNameIgnoreCase(title)
                 .orElseThrow(() ->
@@ -62,6 +64,7 @@ public class MovieServiceImpl implements MovieService {
     }
 
     @Override
+    @Transactional
     public List<MovieResponseDto> getMoviesByLanguage(String language) {
         return movieRepository.findByLanguageIgnoreCase(language)
                 .stream()
@@ -70,8 +73,9 @@ public class MovieServiceImpl implements MovieService {
     }
 
     @Override
+    @Transactional
     public List<MovieResponseDto> getMoviesByGenre(Genre genre) {
-        return movieRepository.findByGenresContaining(genre)
+        return movieRepository.findByGenre(genre)
                 .stream()
                 .map(movie -> modelMapper.map(movie, MovieResponseDto.class))
                 .toList();

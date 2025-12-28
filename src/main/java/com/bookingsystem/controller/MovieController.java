@@ -3,6 +3,7 @@ package com.bookingsystem.controller;
 import com.bookingsystem.dto.MovieRequestDto;
 import com.bookingsystem.dto.MovieResponseDto;
 import com.bookingsystem.entity.enums.Genre;
+import com.bookingsystem.exception.InvalidRequestException;
 import com.bookingsystem.service.MovieService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+
 
 @RestController
 @RequestMapping("/api/v1/movies")
@@ -43,16 +45,38 @@ public class MovieController {
     }
 
     @GetMapping("/genre")
-    public ResponseEntity<List<MovieResponseDto>> getMoviesByGenre(@RequestParam String genre) {
-        Genre genreEnum = Genre.valueOf(genre.toUpperCase());
-        return ResponseEntity.ok(movieService.getMoviesByGenre(genreEnum));
+    public ResponseEntity<List<MovieResponseDto>> getMoviesByGenre(
+            @RequestParam String genre
+    ) {
+        return ResponseEntity.ok(
+                movieService.getMoviesByGenre(parse(genre))
+        );
     }
+
     @GetMapping("/language")
-    public ResponseEntity<List<MovieResponseDto>> searchMoviesByLanguage(@RequestParam String language) {
-        return ResponseEntity.ok(movieService.getMoviesByLanguage(language));
+    public ResponseEntity<List<MovieResponseDto>> getMoviesByLanguage(
+            @RequestParam String language
+    ) {
+        return ResponseEntity.ok(
+                movieService.getMoviesByLanguage(language)
+        );
     }
+
     @GetMapping("/title")
-    public ResponseEntity<MovieResponseDto> getMovieByExactTitle(@RequestParam String title) {
-        return ResponseEntity.ok(movieService.getMovieByExactTitle(title));
+    public ResponseEntity<MovieResponseDto> getMovieByExactTitle(
+            @RequestParam String title
+    ) {
+        return ResponseEntity.ok(
+                movieService.getMovieByExactTitle(title)
+        );
     }
+    private Genre parse(String genre) {
+        try {
+            return Genre.valueOf(genre.toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new InvalidRequestException("Invalid genre: " + genre);
+        }
+    }
+
+
 }
