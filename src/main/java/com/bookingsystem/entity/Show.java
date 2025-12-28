@@ -1,6 +1,7 @@
 package com.bookingsystem.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -28,5 +29,5 @@ public class Show {
     private Theater theater;
 
     @OneToMany(mappedBy = "show", fetch = FetchType.LAZY)
-    private List<Booking> bookingList;
+    private List<Booking> bookings;
 }

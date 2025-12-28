@@ -20,7 +20,7 @@ public class ShowController {
     @PostMapping("/add-show")
     public ResponseEntity<ShowResponseDto> createShow(@Valid @RequestBody ShowRequestDto requestDto) {
         ShowResponseDto response = showService.createShow(requestDto);
-        return new ResponseEntity<>(response, HttpStatus.CREATED);
+        return ResponseEntity.ok(response);
     }
     @GetMapping
     public ResponseEntity<List<ShowResponseDto>> getAllShows() {
