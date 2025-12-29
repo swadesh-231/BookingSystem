@@ -36,7 +36,9 @@ public class TheaterServiceImpl implements TheaterService {
         if (location == null || location.isBlank()) {
             throw new InvalidRequestException("Location must not be empty");
         }
-        return theaterRepository.findByLocationIgnoreCase(location)
+        String normalizedLocation = location.trim().toLowerCase();
+
+        return theaterRepository.findByLocationNormalized(normalizedLocation)
                 .stream()
                 .map(theater -> modelMapper.map(theater, TheaterResponseDto.class))
                 .toList();

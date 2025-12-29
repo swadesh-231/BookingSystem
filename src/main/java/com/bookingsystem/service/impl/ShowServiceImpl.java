@@ -33,11 +33,16 @@ public class ShowServiceImpl implements ShowService {
         Theater theater = theaterRepository.findById(requestDto.getTheaterId())
                 .orElseThrow(() -> new TheaterNotFoundException(requestDto.getTheaterId()));
 
-        Show show = modelMapper.map(requestDto, Show.class);
-        show.setMovie(movie);
-        show.setTheater(theater);
+        Show show = Show.builder()
+                .showTime(requestDto.getShowTime())
+                .price(requestDto.getPrice())
+                .movie(movie)
+                .theater(theater)
+                .build();
 
-        return modelMapper.map(showRepository.save(show), ShowResponseDto.class);
+        Show savedShow = showRepository.save(show);
+
+        return modelMapper.map(savedShow, ShowResponseDto.class);
     }
 
     @Override

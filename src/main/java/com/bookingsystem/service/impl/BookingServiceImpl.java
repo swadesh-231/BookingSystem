@@ -27,7 +27,6 @@ public class BookingServiceImpl implements BookingService {
     private final UserRepository userRepository;
     private final ModelMapper modelMapper;
 
-
     @Override
     public BookingResponseDto createBooking(BookingRequestDto bookingRequestDto) {
         Show show = showRepository.findById(bookingRequestDto.getShowId())
