@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: BookingSystem
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/HotelDB
+    username: postgres
+    password: 456784
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
