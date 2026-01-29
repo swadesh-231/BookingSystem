@@ -15,8 +15,7 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class RoomDto {
-    private Long id;
+public class RoomRequest {
     @NotBlank(message = "Room type is required")
     private String type;
 
