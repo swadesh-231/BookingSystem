@@ -7,17 +7,22 @@ import com.bookingsystem.entity.Room;
 import com.bookingsystem.exception.ResourceNotFoundException;
 import com.bookingsystem.repository.HotelRepository;
 import com.bookingsystem.repository.RoomRepository;
+import com.bookingsystem.service.InventoryService;
 import com.bookingsystem.service.RoomService;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class RoomServiceImpl implements RoomService {
     private final RoomRepository roomRepository;
     private final HotelRepository hotelRepository;
+    private final InventoryService inventoryService;
     private final ModelMapper modelMapper;
 
     @Override
@@ -27,6 +32,9 @@ public class RoomServiceImpl implements RoomService {
         Room room = modelMapper.map(roomRequest, Room.class);
         room.setHotel(hotel);
         roomRepository.save(room);
+        if (hotel.getActive()){
+            inventoryService.initializeRoomForAYear(room);
+        }
         return modelMapper.map(room, RoomResponse.class);
     }
 
@@ -34,7 +42,7 @@ public class RoomServiceImpl implements RoomService {
     public List<RoomResponse> getAllRoomsInHotel(Long hotelId) {
         Hotel hotel = hotelRepository.findById(hotelId)
                 .orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", hotelId));
-        //bi directional mapping in hotel entity class
+        //bidirectional mapping in hotel entity class
         return hotel.getRooms().stream()
                 .map(room -> modelMapper.map(room, RoomResponse.class))
                 .toList();
@@ -51,6 +59,7 @@ public class RoomServiceImpl implements RoomService {
     public void deleteRoomById(Long roomId) {
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new ResourceNotFoundException("Room", "id", roomId));
+        inventoryService.deleteAllInventories(room);
         roomRepository.delete(room);
     }
 

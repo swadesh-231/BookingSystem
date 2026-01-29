@@ -3,10 +3,14 @@ package com.bookingsystem.service.impl;
 import com.bookingsystem.dto.HotelRequest;
 import com.bookingsystem.dto.HotelResponse;
 import com.bookingsystem.entity.Hotel;
+import com.bookingsystem.entity.Room;
 import com.bookingsystem.exception.APIException;
 import com.bookingsystem.exception.ResourceNotFoundException;
 import com.bookingsystem.repository.HotelRepository;
+import com.bookingsystem.repository.InventoryRepository;
+import com.bookingsystem.repository.RoomRepository;
 import com.bookingsystem.service.HotelService;
+import com.bookingsystem.service.InventoryService;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
@@ -19,6 +23,8 @@ import java.util.List;
 @Transactional
 public class HotelServiceImpl implements HotelService {
     private final HotelRepository hotelRepository;
+    private final InventoryService inventoryService;
+    private final RoomRepository roomRepository;
     private final ModelMapper modelMapper;
 
     @Override
@@ -65,8 +71,11 @@ public class HotelServiceImpl implements HotelService {
 
     @Override
     public void deleteHotelById(Long id) {
-        if (!hotelRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Hotel", "id", id);
+        Hotel hotel = hotelRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", id));
+        for (Room room : hotel.getRooms()) {
+            inventoryService.deleteAllInventories(room);
+            roomRepository.deleteById(room.getId());
         }
         hotelRepository.deleteById(id);
     }
@@ -76,6 +85,9 @@ public class HotelServiceImpl implements HotelService {
         Hotel hotel = hotelRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", id));
         hotel.setActive(status);
+        for (Room room : hotel.getRooms()) {
+            inventoryService.initializeRoomForAYear(room);
+        }
         Hotel updatedHotel = hotelRepository.save(hotel);
         return modelMapper.map(updatedHotel, HotelResponse.class);
     }
