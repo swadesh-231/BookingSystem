@@ -5,6 +5,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @AllArgsConstructor
@@ -32,5 +33,9 @@ public class Hotel {
     private HotelContact contact;
     @Column(nullable = false)
     private Boolean active;
+    @ManyToOne
+    private User owner;
+    @OneToMany(mappedBy = "hotel")
+    private List<Room> rooms;
 
 }
