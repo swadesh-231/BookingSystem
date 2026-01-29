@@ -1,12 +1,14 @@
 package com.bookingsystem.entity;
 
+import com.bookingsystem.entity.enums.BookingStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-import java.math.BigDecimal;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Set;
 
 @Entity
 @AllArgsConstructor
@@ -14,12 +16,7 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @Builder
-@Table(uniqueConstraints =
-@UniqueConstraint(
-        name = "unique_hotel_room_date",
-        columnNames = {"hotel_id", "room_id", "date"}
-))
-public class Inventory {
+public class Booking {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -29,23 +26,32 @@ public class Inventory {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name= "room_id", nullable = false)
     private Room room;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
     @Column(nullable = false)
-    private LocalDate date;
-    @Column(nullable = false, columnDefinition = "INTEGER DEFAULT 0")
-    private Integer bookedCount;
+    private Integer roomsCount;
     @Column(nullable = false)
-    private Integer totalCount;
-    @Column(nullable = false, precision = 5, scale = 2)
-    private BigDecimal surgeFactor;
-    @Column(nullable = false, precision = 10, scale = 2)
-    private BigDecimal price;
+    private LocalDate checkInDate;
     @Column(nullable = false)
-    private String city;
-    @Column(nullable = false)
-    private Boolean closed;
-
+    private LocalDate checkOutDate;
     @CreationTimestamp
     private LocalDateTime createdAt;
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "payment_id")
+    private Payment payment;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private BookingStatus status;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "booking_guest",
+            joinColumns = @JoinColumn(name = "booking_id"),
+            inverseJoinColumns = @JoinColumn(name = "guest_id")
+    )
+    private Set<Guest> guests;
+
 }
