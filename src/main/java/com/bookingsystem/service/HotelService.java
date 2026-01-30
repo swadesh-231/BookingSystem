@@ -1,5 +1,6 @@
 package com.bookingsystem.service;
 
+import com.bookingsystem.dto.HotelInfoDto;
 import com.bookingsystem.dto.HotelRequest;
 import com.bookingsystem.dto.HotelResponse;
 
@@ -12,4 +13,6 @@ public interface HotelService {
     HotelResponse updateHotelById(Long id, HotelRequest hotelRequest);
     void deleteHotelById(Long id);
     HotelResponse updateHotelStatus(Long id, Boolean status);
+
+    HotelInfoDto getHotelInfoById(Long hotelId);
 }

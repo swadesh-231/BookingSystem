@@ -1,5 +1,6 @@
 package com.bookingsystem.service.impl;
 
+import com.bookingsystem.dto.HotelInfoDto;
 import com.bookingsystem.dto.HotelRequest;
 import com.bookingsystem.dto.HotelResponse;
 import com.bookingsystem.entity.Hotel;
@@ -7,7 +8,7 @@ import com.bookingsystem.entity.Room;
 import com.bookingsystem.exception.APIException;
 import com.bookingsystem.exception.ResourceNotFoundException;
 import com.bookingsystem.repository.HotelRepository;
-import com.bookingsystem.repository.InventoryRepository;
+
 import com.bookingsystem.repository.RoomRepository;
 import com.bookingsystem.service.HotelService;
 import com.bookingsystem.service.InventoryService;
@@ -40,8 +41,7 @@ public class HotelServiceImpl implements HotelService {
 
     @Override
     public HotelResponse getHotelById(Long id) {
-        Hotel hotel = hotelRepository.findById(id).orElseThrow(()
-                ->new ResourceNotFoundException("Hotel","id",id));
+        Hotel hotel = hotelRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", id));
         return modelMapper.map(hotel, HotelResponse.class);
     }
 
@@ -85,11 +85,22 @@ public class HotelServiceImpl implements HotelService {
         Hotel hotel = hotelRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", id));
         hotel.setActive(status);
-        for (Room room : hotel.getRooms()) {
-            inventoryService.initializeRoomForAYear(room);
+        if (Boolean.TRUE.equals(status)) {
+            for (Room room : hotel.getRooms()) {
+                inventoryService.initializeRoomForAYear(room);
+            }
+        } else {
+            for (Room room : hotel.getRooms()) {
+                inventoryService.deleteAllInventories(room);
+            }
         }
         Hotel updatedHotel = hotelRepository.save(hotel);
         return modelMapper.map(updatedHotel, HotelResponse.class);
+    }
+
+    @Override
+    public HotelInfoDto getHotelInfoById(Long hotelId) {
+        return null;
     }
 
 }
