@@ -14,7 +14,6 @@ import java.time.LocalDate;
 public interface InventoryRepository extends JpaRepository<Inventory, Long> {
     void deleteByRoom(Room room);
     boolean existsByRoomAndDate(Room room, LocalDate date);
-
     @Query("""
             SELECT DISTINCT i.hotel
             FROM Inventory i

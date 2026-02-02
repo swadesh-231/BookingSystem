@@ -16,8 +16,7 @@ import java.util.List;
 public class RoomController {
     private final RoomService roomService;
     @PostMapping
-    public ResponseEntity<RoomResponse> createNewRoom(@PathVariable Long hotelId,
-            @Valid @RequestBody RoomRequest roomRequest) {
+    public ResponseEntity<RoomResponse> createNewRoom(@PathVariable Long hotelId,@Valid @RequestBody RoomRequest roomRequest) {
         RoomResponse room = roomService.createNewRoom(hotelId, roomRequest);
         return ResponseEntity.ok(room);
     }

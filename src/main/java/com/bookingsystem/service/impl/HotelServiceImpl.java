@@ -1,8 +1,6 @@
 package com.bookingsystem.service.impl;
 
-import com.bookingsystem.dto.HotelInfoDto;
-import com.bookingsystem.dto.HotelRequest;
-import com.bookingsystem.dto.HotelResponse;
+import com.bookingsystem.dto.*;
 import com.bookingsystem.entity.Hotel;
 import com.bookingsystem.entity.Room;
 import com.bookingsystem.exception.APIException;
@@ -18,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -100,7 +99,11 @@ public class HotelServiceImpl implements HotelService {
 
     @Override
     public HotelInfoDto getHotelInfoById(Long hotelId) {
-        return null;
+        Hotel hotel = hotelRepository.findById(hotelId)
+                .orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", hotelId));
+        List<RoomResponse> rooms = hotel.getRooms().stream().map((element) ->
+                modelMapper.map(element, RoomResponse.class)).toList();
+        return new HotelInfoDto(modelMapper.map(hotel, HotelSearchResponse.class), rooms);
     }
 
 }
