@@ -1,5 +1,6 @@
 package com.bookingsystem.dto;
 
+import com.bookingsystem.entity.enums.Gender;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -11,10 +12,9 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class BookingRequest {
-    private Long hotelId;
-    private Long roomId;
-    private LocalDate checkInDate;
-    private LocalDate checkOutDate;
-    private Integer roomsCount;
+public class GuestDto {
+    private Long id;
+    private String name;
+    private Gender gender;
+    private LocalDate dateOfBirth;
 }

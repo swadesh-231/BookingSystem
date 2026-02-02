@@ -1,9 +1,10 @@
 package com.bookingsystem.entity;
 
-
 import com.bookingsystem.entity.enums.Gender;
 import jakarta.persistence.*;
 import lombok.*;
+
+import java.time.LocalDate;
 
 @Entity
 @Getter
@@ -22,5 +23,5 @@ public class Guest {
     private String name;
     @Enumerated(EnumType.STRING)
     private Gender gender;
-    private Integer age;
+    private LocalDate dateOfBirth;
 }

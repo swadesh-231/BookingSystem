@@ -1,6 +1,7 @@
 package com.bookingsystem.exception;
 
 import com.bookingsystem.dto.ApiResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -8,6 +9,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -35,7 +37,20 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(APIException.class)
     public ResponseEntity<ApiResponse> myAPIException(APIException e) {
         String message = e.getMessage();
-        ApiResponse apiResponse = ApiResponse.builder().message(message).status(false).build();
+        ApiResponse apiResponse = ApiResponse.builder()
+                .message(message)
+                .status(false)
+                .build();
         return new ResponseEntity<>(apiResponse, HttpStatus.BAD_REQUEST);
     }
+
+    @ExceptionHandler(RoomNotAvailableException.class)
+    public ResponseEntity<ApiResponse> handleRoomNotAvailable(RoomNotAvailableException ex) {
+        ApiResponse response = ApiResponse.builder()
+                .message(ex.getMessage())
+                .status(false)
+                .build();
+        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    }
+
 }
