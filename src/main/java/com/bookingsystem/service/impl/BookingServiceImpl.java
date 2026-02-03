@@ -5,14 +5,12 @@ import com.bookingsystem.dto.BookingResponse;
 import com.bookingsystem.dto.GuestDto;
 import com.bookingsystem.entity.*;
 import com.bookingsystem.entity.enums.BookingStatus;
-import com.bookingsystem.exception.BookingExpiredException;
-import com.bookingsystem.exception.InvalidBookingStateException;
-import com.bookingsystem.exception.ResourceNotFoundException;
-import com.bookingsystem.exception.RoomNotAvailableException;
+import com.bookingsystem.exception.*;
 import com.bookingsystem.repository.*;
 import com.bookingsystem.service.BookingService;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +18,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -75,6 +74,10 @@ public class BookingServiceImpl implements BookingService {
         if (booking.getStatus() != BookingStatus.RESERVED) {
             throw new InvalidBookingStateException("Booking is not under reserved state, cannot add guests");
         }
+        User user = getCurrentUser();
+        if (user.equals(booking.getUser())) {
+            throw new UnAuthorisedException("User is unauthorized to add guests");
+        }
         for (GuestDto guestDto : guestList) {
             Guest guest = Guest.builder()
                     .name(guestDto.getName())
@@ -93,10 +96,7 @@ public class BookingServiceImpl implements BookingService {
     public boolean hasBookingExpired(Booking booking) {
         return booking.getCreatedAt().plusMinutes(5).isBefore(LocalDateTime.now());
     }
-
     public User getCurrentUser() {
-        User user = new User();
-        user.setId(1L);
-        return user;
+        return (User) Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()).getPrincipal();
     }
 }

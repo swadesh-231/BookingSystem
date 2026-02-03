@@ -3,8 +3,10 @@ package com.bookingsystem.service.impl;
 import com.bookingsystem.dto.*;
 import com.bookingsystem.entity.Hotel;
 import com.bookingsystem.entity.Room;
+import com.bookingsystem.entity.User;
 import com.bookingsystem.exception.APIException;
 import com.bookingsystem.exception.ResourceNotFoundException;
+import com.bookingsystem.exception.UnAuthorisedException;
 import com.bookingsystem.repository.HotelRepository;
 
 import com.bookingsystem.repository.RoomRepository;
@@ -12,10 +14,12 @@ import com.bookingsystem.service.HotelService;
 import com.bookingsystem.service.InventoryService;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -34,6 +38,8 @@ public class HotelServiceImpl implements HotelService {
         }
         Hotel hotel = modelMapper.map(hotelRequest, Hotel.class);
         hotel.setActive(false);
+        User user = (User) Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()).getPrincipal();
+        hotel.setOwner(user);
         hotelRepository.save(hotel);
         return modelMapper.map(hotel, HotelResponse.class);
     }
@@ -41,6 +47,10 @@ public class HotelServiceImpl implements HotelService {
     @Override
     public HotelResponse getHotelById(Long id) {
         Hotel hotel = hotelRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", id));
+        User user = (User) Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()).getPrincipal();
+        if (!user.equals(hotel.getOwner())) {
+            throw new UnAuthorisedException("User is unauthorized to view hotel");
+        }
         return modelMapper.map(hotel, HotelResponse.class);
     }
 
@@ -56,6 +66,10 @@ public class HotelServiceImpl implements HotelService {
     public HotelResponse updateHotelById(Long id, HotelRequest hotelRequest) {
         Hotel existingHotel = hotelRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", id));
+        User user = (User) Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()).getPrincipal();
+        if (!user.equals(existingHotel.getOwner())) {
+            throw new UnAuthorisedException("User is unauthorized to view hotel");
+        }
         existingHotel.setName(hotelRequest.getName());
         existingHotel.setCity(hotelRequest.getCity());
         existingHotel.setPhotos(hotelRequest.getPhotos());
@@ -72,6 +86,10 @@ public class HotelServiceImpl implements HotelService {
     public void deleteHotelById(Long id) {
         Hotel hotel = hotelRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", id));
+        User user = (User) Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()).getPrincipal();
+        if (!user.equals(hotel.getOwner())) {
+            throw new UnAuthorisedException("User is unauthorized to view hotel");
+        }
         for (Room room : hotel.getRooms()) {
             inventoryService.deleteAllInventories(room);
             roomRepository.deleteById(room.getId());
@@ -83,6 +101,10 @@ public class HotelServiceImpl implements HotelService {
     public HotelResponse updateHotelStatus(Long id, Boolean status) {
         Hotel hotel = hotelRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", id));
+        User user = (User) Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()).getPrincipal();
+        if (!user.equals(hotel.getOwner())) {
+            throw new UnAuthorisedException("User is unauthorized to view hotel");
+        }
         hotel.setActive(status);
         if (Boolean.TRUE.equals(status)) {
             for (Room room : hotel.getRooms()) {
