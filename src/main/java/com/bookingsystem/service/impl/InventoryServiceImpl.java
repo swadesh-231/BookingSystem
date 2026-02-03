@@ -1,11 +1,10 @@
 package com.bookingsystem.service.impl;
 
-import com.bookingsystem.dto.HotelResponse;
-import com.bookingsystem.dto.HotelSearchRequest;
-import com.bookingsystem.dto.HotelSearchResponse;
+import com.bookingsystem.dto.*;
 import com.bookingsystem.entity.Hotel;
 import com.bookingsystem.entity.Inventory;
 import com.bookingsystem.entity.Room;
+import com.bookingsystem.repository.HotelPriceRepository;
 import com.bookingsystem.repository.InventoryRepository;
 import com.bookingsystem.service.InventoryService;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +24,7 @@ import java.time.temporal.ChronoUnit;
 public class InventoryServiceImpl implements InventoryService {
     private final InventoryRepository inventoryRepository;
     private final ModelMapper modelMapper;
+    private final HotelPriceRepository hotelPriceRepository;
 
     @Override
     public void initializeRoomForAYear(Room room) {
@@ -56,13 +56,21 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     @Override
-    public Page<HotelSearchResponse> searchHotels(HotelSearchRequest hotelSearchRequest) {
+    public Page<HotelPriceResponse> searchHotels(HotelSearchRequest hotelSearchRequest) {
         Pageable pageable = PageRequest.of(hotelSearchRequest.getPage(), hotelSearchRequest.getSize());
-        Long dateCount =
+        long dateCount =
                 ChronoUnit.DAYS.between(hotelSearchRequest.getStartDate(), hotelSearchRequest.getEndDate()) + 1;
-        Page<Hotel> hotelPage = inventoryRepository.findHotelsWithAvailableInventory(hotelSearchRequest.getCity(),
-                hotelSearchRequest.getStartDate(),hotelSearchRequest.getEndDate(),hotelSearchRequest.getRoomsCount(),dateCount,pageable);
 
-        return hotelPage.map((element) -> modelMapper.map(element, HotelSearchResponse.class));
+        // business logic - 90 days
+        Page<HotelPriceDto> hotelPage =
+                hotelPriceRepository.findHotelsWithAvailableInventory(hotelSearchRequest.getCity(),
+                        hotelSearchRequest.getStartDate(), hotelSearchRequest.getEndDate(), hotelSearchRequest.getRoomsCount(),
+                        dateCount, pageable);
+
+        return hotelPage.map(hotelPriceDto -> {
+            HotelPriceResponse hotelPriceResponse = modelMapper.map(hotelPriceDto.getHotel(), HotelPriceResponse.class);
+            hotelPriceResponse.setPrice(hotelPriceDto.getPrice());
+            return hotelPriceResponse;
+        });
     }
 }
