@@ -3,11 +3,13 @@ package com.bookingsystem.service.impl;
 import com.bookingsystem.dto.BookingRequest;
 import com.bookingsystem.dto.BookingResponse;
 import com.bookingsystem.dto.GuestDto;
+import com.bookingsystem.dto.HotelReport;
 import com.bookingsystem.entity.*;
 import com.bookingsystem.entity.enums.BookingStatus;
 import com.bookingsystem.exception.*;
 import com.bookingsystem.repository.*;
 import com.bookingsystem.service.BookingService;
+import com.stripe.model.Event;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -15,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -92,6 +95,45 @@ public class BookingServiceImpl implements BookingService {
         booking = bookingRepository.save(booking);
         return modelMapper.map(booking, BookingResponse.class);
     }
+
+    @Override
+    public String initiatePayments(Long bookingId) {
+        Booking booking  = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking", "id", bookingId));
+
+        return "";
+    }
+
+    @Override
+    public void capturePayment(Event event) {
+
+    }
+
+    @Override
+    public void cancelBooking(Long bookingId) {
+
+    }
+
+    @Override
+    public BookingStatus getBookingStatus(Long bookingId) {
+        return null;
+    }
+
+    @Override
+    public List<BookingResponse> getAllBookingsByHotelId(Long hotelId) {
+        return List.of();
+    }
+
+    @Override
+    public HotelReport getHotelReport(Long hotelId, LocalDate startDate, LocalDate endDate) {
+        return null;
+    }
+
+    @Override
+    public List<BookingResponse> getMyBookings() {
+        return List.of();
+    }
+
 
     public boolean hasBookingExpired(Booking booking) {
         return booking.getCreatedAt().plusMinutes(5).isBefore(LocalDateTime.now());
