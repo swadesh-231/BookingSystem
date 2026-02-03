@@ -1,20 +1,25 @@
 spring:
   application:
-    name: BookingSystem
+    name: ${SPRING_APPLICATION_NAME}
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/HotelDB
-    username: postgres
-    password: 456784
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
 
   jpa:
     hibernate:
       ddl-auto: create-drop
     defer-datasource-initialization: true
+
   sql:
     init:
       mode: always
 
+  app:
+    secret: ${JWT_SECRET}
+    expiration: ${JWT_EXPIRATION}
+
 server:
   servlet:
-    context-path: /api/v1
+    context-path: ${SERVER_CONTEXT_PATH}
