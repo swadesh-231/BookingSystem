@@ -14,6 +14,7 @@ spring:
   app:
     secret: ${JWT_SECRET}
     expiration: ${JWT_EXPIRATION}
+    refreshtoken: ${JWT_REFRESH_TOKEN}
 
 server:
   servlet:

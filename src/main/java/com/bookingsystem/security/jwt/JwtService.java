@@ -18,6 +18,8 @@ public class JwtService {
     private String secret;
     @Value("${spring.app.expiration}")
     private Long expiration;
+    @Value("${spring.app.refreshtoken}")
+    private Long refreshTime;
 
     public String generateAccessToken(User user) {
         return Jwts.builder()
@@ -32,7 +34,7 @@ public class JwtService {
         return Jwts.builder()
                 .subject(user.getId().toString())
                 .issuedAt(new Date())
-                .expiration(new Date((new Date()).getTime() + expiration))
+                .expiration(new Date((new Date()).getTime() + refreshTime))
                 .signWith(getSecretKey())
                 .compact();
     }
