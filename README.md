@@ -1,4 +1,4 @@
-# 🏨 Hotel Booking System
+# Booking System
 
 ![Java](https://img.shields.io/badge/Java-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-F2F4F9?style=for-the-badge&logo=spring-boot)
@@ -6,178 +6,198 @@
 ![Stripe](https://img.shields.io/badge/Stripe-626CD9?style=for-the-badge&logo=Stripe&logoColor=white)
 ![JWT](https://img.shields.io/badge/JWT-black?style=for-the-badge&logo=JSON%20web%20tokens)
 
-A comprehensive, enterprise-grade Spring Boot application for hotel management, booking orchestration, and dynamic pricing. This system facilitates secure, real-time reservations with integrated Stripe payments and robust inventory control.
+## Project Title
+**Booking System** - Enterprise Hotel Management & Reservation Platform
 
----
+## High-level Overview
+The Booking System is a robust backend application designed to facilitate end-to-end hotel operations. It solves the complexity of managing hotel inventory, processing secure payments, and calculating dynamic pricing in real-time. The system serves as a centralized platform for hotel managers to control their assets and for users to seamlessly book accommodations. Its core objective is to provide a scalable, secure, and transactional consistent environment for high-volume booking scenarios.
 
-## 📋 Table of Contents
+## Architecture Overview
+The application utilizes a **Layered Monolithic Architecture** built on the Spring Boot framework. This design was chosen to simplify deployment and development while maintaining clear separation of concerns.
 
-- [Key Features](#-key-features)
-- [System Architecture](#-system-architecture)
-- [Tech Stack](#-tech-stack)
-- [Database Design](#-database-design)
-- [API Documentation](#-api-documentation)
-- [Security Implementation](#-security-implementation)
-- [Getting Started](#-getting-started)
-- [Configuration](#-configuration)
-
----
-
-## ✨ Key Features
-
-### 🏨 Core Hotel Operations
-- **Hotel Management**: Onboard hotels, manage amenities, and control lifecycle status.
-- **Room Inventory**: Hierarchical room management with capacity planning and real-time availability tracking.
-- **Smart Search**: Filter hotels by city, dates, and guest capacity with pagination support.
-
-### 💰 Dynamic Pricing Engine
-Sophisticated strategy pattern implementation for calculating room rates:
-- **Base Pricing**: Standard room rates.
-- **Surge Pricing**: Automatically adjusts rates based on demand factors.
-- **Occupancy Pricing**: Incremental pricing based on current booking levels (>80%).
-- **Urgency Pricing**: Premium rates for last-minute bookings (within 7 days).
-- **Holiday Pricing**: configurable holiday markups.
-
-### 📅 Booking & Payments
-- **Secure Reservations**: End-to-end booking lifecycle management.
-- **Stripe Integration**: PCI-DSS compliant checkout sessions for payments.
-- **Transaction Safety**: Minimum transaction amount enforcement (₹50) to prevent gateway errors.
-
----
-
-## 🏗 System Architecture
-
-The application follows a clean, layered monolithic architecture designed for maintainability and scalability.
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                   Presentation Layer                        │
-│   REST Controllers (Auth, Hotel, Booking, Payment API)      │
-└─────────────────────────────┬───────────────────────────────┘
-                              │
-┌─────────────────────────────▼───────────────────────────────┐
-│                      Service Layer                          │
-│    Business Logic • Pricing Strategies • Payment Processing │
-└─────────────────────────────┬───────────────────────────────┘
-                              │
-┌─────────────────────────────▼───────────────────────────────┐
-│                    Data Access Layer                        │
-│           Spring Data JPA Repositories & Entities           │
-└─────────────────────────────┬───────────────────────────────┘
-                              │
-┌─────────────────────────────▼───────────────────────────────┐
-│                       PostgreSQL                            │
-│                  Relational Persistence                     │
-└─────────────────────────────────────────────────────────────┘
-```
+- **Presentation Layer (Controllers)**: Handles HTTP requests, input validation, and maps JSON payloads to DTOs.
+- **Service Layer (Business Logic)**: Contains the core domain logic, including booking workflows, state management, and strategy execution.
+- **Persistence Layer (Repositories)**: Manages data access using Spring Data JPA with Hibernate.
+- **Database**: Relational data storage using PostgreSQL.
 
 ### Design Patterns
-- **Strategy Pattern**: Decouples pricing logic (`PricingStrategy`) from the core booking service, allowing flexible rate calculations.
-- **DTO Pattern**: Using `ModelMapper` to separate internal entities from external API contracts.
-- **Repository Pattern**: Abstraction layer for data access.
+- **Strategy Pattern (Pricing)**: Used to decouple pricing algorithms (`HolidayPricing`, `SurgePricing`) from the core booking logic, allowing new pricing models to be added without modifying existing code.
+- **DTO Pattern**: Segregates internal JPA entities from external API contracts to prevent data leakage and ensure API stability.
+- **Repository Pattern**: Abstracts the data access logic.
 
----
+## Tech Stack
 
-## 🛠 Tech Stack
+### Core Backend
+- **Language**: Java 21
+- **Framework**: Spring Boot 4.0.2
+- **Build Tool**: Gradle 8.x
 
-| Component | Technology | Description |
-|-----------|------------|-------------|
-| **Core** | Java 21 | Latest LTS release |
-| **Framework** | Spring Boot 3.x | Web, Data JPA, Security, Validation |
-| **Database** | PostgreSQL | Relational data store |
-| **Security** | Spring Security + JWT | Stateless authentication |
-| **Payments** | Stripe API | Payment processing gateway |
-| **Build Tool** | Gradle | Dependency management |
-| **Utilities** | Lombok, ModelMapper | Boilerplate reduction & mapping |
+### Data & Persistence
+- **Database**: PostgreSQL
+- **ORM**: Spring Data JPA (Hibernate)
 
----
+### Security & Authentication
+- **Authentication**: JWT (JSON Web Tokens) via `jjwt` library
+- **Security**: Spring Security (Stateless Session Management)
+- **Password Hashing**: BCrypt
 
-## 🗄 Database Design
+### Third-Party Integrations
+- **Payments**: Stripe Java SDK (v31.3.0)
 
-The database schema is normalized to ensure data integrity and efficient querying.
+### Utilities
+- **Mapping**: ModelMapper
+- **Boilerplate Reduction**: Lombok
+- **Configuration**: `java-dotenv`
 
-### Entity Relationship Diagram
+## Project Structure
 
-![ER Diagram](Booking.png)
+```
+src/main/java/com/bookingsystem
+├── config/                 # Application configuration (Stripe, Security, AppConfig)
+├── controller/             # REST API Controllers (Entry points)
+├── dto/                    # Data Transfer Objects (Request/Response models)
+├── entity/                 # JPA Entities representing database tables
+├── exception/              # Global exception handling and custom exceptions
+├── repository/             # Spring Data interfaces for database access
+├── security/               # JWT filters, entry points, and security constraints
+├── service/                # Business logic interfaces
+│   └── impl/               # Service implementations
+└── strategy/               # Pricing strategy interfaces and implementations
+```
 
----
-
-## 📡 API Documentation
-
-### Authentication
-- **Register**: `POST /auth/register`
-- **Login**: `POST /auth/login` (Returns JWT)
-
-### Hotel Management (Admin)
-- **Create Hotel**: `POST /admin/hotel`
-- **Add Room**: `POST /admin/hotels/{id}/rooms`
-- **Toggle Status**: `PATCH /admin/hotel/{id}/status`
-
-### Public Endpoints
-- **Search Hotels**: `GET /hotels/search?city=NY&startDate=...`
-- **Hotel Info**: `GET /hotels/{id}/info`
-
-### Booking Operations
-- **Initialize**: `POST /bookings/init`
-- **Add Guests**: `POST /bookings/{id}/addguest`
-- **Pay**: `POST /bookings/{id}/payments`
-- **Cancel**: `POST /bookings/{id}/cancel`
-
----
-
-## 🔐 Security Implementation
-
-- **Stateless Authentication**: Utilizes `JwtAuthFilter` to validate tokens on every request.
-- **RBAC (Role-Based Access Control)**:
-  - `HOTEL_MANAGER`: Full access to administrative endpoints (`/admin/**`).
-  - `Authenticated User`: Access to personal booking endpoints (`/bookings/**`).
-  - `Public`: Open access to search and auth endpoints.
-- **Password Security**: BCrypt hashing for all user passwords.
-
----
-
-## 🚀 Getting Started
+## Setup Instructions
 
 ### Prerequisites
-- JDK 21
-- PostgreSQL
-- Gradle 8+
+- JDK 21 installed.
+- PostgreSQL database running locally or remotely.
+- Gradle installed (or use the provided wrapper).
+- A Stripe account for API keys.
+
+### Environment Variables
+Create a file named `.env` in the root directory or configure these variables in your environment.
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `DB_URL` | PostgreSQL Connection String | `jdbc:postgresql://localhost:5432/booking_db` |
+| `DB_USERNAME` | Database User | `postgres` |
+| `DB_PASSWORD` | Database Password | `secretpassword` |
+| `JWT_SECRET` | 256-bit Secret Key for JWT | `your_secure_randomly_generated_key` |
+| `JWT_EXPIRY` | Token Expiry in Ms | `86400000` |
+| `STRIPE_KEY` | Stripe Secret API Key | `sk_test_...` |
 
 ### Database Setup
-Ensure PostgreSQL is running and create a database:
-```sql
-CREATE DATABASE booking_db;
-```
+1. Create a database named `booking_db` in PostgreSQL.
+   ```sql
+   CREATE DATABASE booking_db;
+   ```
+2. The application is configured with `ddl-auto=update`, so tables will be created automatically upon the first run.
 
-### Configuration
-Create a `.env` file in the root directory:
+### Build and Run Instructions
+1. **Compile the project**:
+   ```bash
+   ./gradlew clean build
+   ```
+2. **Run the application**:
+   ```bash
+   ./gradlew bootRun
+   ```
 
-```properties
-DB_URL=jdbc:postgresql://localhost:5432/booking_db
-DB_USERNAME=postgres
-DB_PASSWORD=your_password
-JWT_SECRET=your_jwt_secret_key_must_be_long_enough
-STRIPE_KEY=sk_test_...
-```
+## API Documentation
 
-### Build & Run
+The API is structured around REST principles. All responses accept and return JSON.
+
+### Base URL
+`http://localhost:8080`
+
+### Authentication Endpoints
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| POST | `/auth/register` | Register a new user account | No |
+| POST | `/auth/login` | Authenticate and receive an Access Token | No |
+
+### Hotel Management (Admin)
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| POST | `/admin/hotel` | Onboard a new hotel | Yes (HOTEL_MANAGER) |
+| POST | `/admin/hotels/{id}/rooms` | Add inventory/rooms to a hotel | Yes (HOTEL_MANAGER) |
+| PATCH | `/admin/hotel/{id}/status` | Activate or Deactivate a hotel | Yes (HOTEL_MANAGER) |
+
+### Booking Operations
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| POST | `/bookings/init` | Initialize a booking (Reserve inventory) | Yes |
+| POST | `/bookings/{id}/addguest` | Add guest details to a booking | Yes |
+| POST | `/bookings/{id}/payments` | Generate Stripe Checkout Session | Yes |
+| POST | `/bookings/{id}/cancel` | Cancel an active booking | Yes |
+
+### Search
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | `/hotels/search` | Search hotels by city, date, and guests | No |
+
+## Database Design Overview
+
+The database design prioritizes data integrity and locking mechanisms to prevent overbooking.
+
+### Key Entities
+- **User**: Stores authenticated user data and role mapping.
+- **Hotel**: The root entity for property management.
+- **Room**: Defines the configuration (capacity, type) of rooms in a hotel.
+- **Inventory**: Represents specific availability for a Room on a specific Date. This table is pivotal for the locking mechanism.
+- **Booking**: Manages the lifecycle and state of a reservation.
+
+### Entity Relationship Diagram
+See the visual representation of the schema below:
+
+![Database Schema Diagram](Booking.png)
+
+## Authentication & Authorization Strategy
+
+The system uses **Stateless Authentication** with JWT (JSON Web Tokens).
+1. **Login**: User submits credentials. Server validates and issues a signed JWT.
+2. **Request**: Client sends the JWT in the `Authorization` header (`Bearer <token>`).
+3. **Validation**: `JwtAuthFilter` intercepts requests, validates the signature, and sets the Security Context.
+
+**Authorization** is enforced via Role-Based Access Control (RBAC):
+- **GUEST**: Standard access to booking and search.
+- **HOTEL_MANAGER**: Elevated access to administrative endpoints.
+
+## Design Decisions & Tradeoffs
+
+- **Granular Inventory Table**:
+  - *Decision*: Inventory is stored as individual rows per room/date (e.g., Room 101 on 2024-01-01).
+  - *Tradeoff*: This increases table size significantly (365 rows per room per year) but allows for extremely simple and robust row-level locking (`PESSIMISTIC_WRITE`) to guarantee consistency during concurrent bookings.
+- **Strategy Pattern for Pricing**:
+  - *Decision*: Pricing logic is split into small strategy classes.
+  - *Tradeoff*: Increases the number of classes but makes the pricing engine highly testable and extensible without modifying the core service.
+- **Monolithic Architecture**:
+  - *Decision*: Kept as a single deployment unit.
+  - *Tradeoff*: Simpler to develop and deploy than microservices, though potentially harder to scale individual components independently.
+
+## Scalability Considerations
+- **Stateless Service**: Since no session state is stored on the server, the application can be horizontally scaled behind a load balancer.
+- **Database bottleneck**: The heavy reliance on database locking for inventory means the database will be the primary bottleneck. Read replicas could be introduced for the Search API (`GET`) to offload traffic from the primary writer node.
+
+## Security Measures
+- **Input Validation**: usage of `@Valid` and DTO constraints ensures malformed data is rejected early.
+- **Exception Handling**: A global handler masks internal server errors and returns standardized error responses.
+- **CORS/CSRF**: CSRF is disabled (standard for stateless APIs), and CORS is configurable.
+- **Least Privilege**: Endpoints are strictly locked down by role.
+
+## How to Run Tests
+The project includes standard JUnit 5 tests.
 ```bash
-# Build the project
-./gradlew build
-
-# Run the application
-./gradlew bootRun
+./gradlew test
 ```
-The application will start at `http://localhost:8080`.
 
----
+## Future Improvements
+- **Caching**: Implement Redis to cache frequent search results (`/hotels/search`) to reduce DB read pressure.
+- **Async Messaging**: Decouple the notification system (emails) using a message queue like RabbitMQ or Kafka.
+- **Idempotency**: Implement idempotency keys for the booking endpoint to safely handle network retries.
 
-## 🤝 Contributing
-
-Contributions are welcome! Please fork the repository and submit a pull request for review.
-
-1. Fork the repo
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+## License
+This project is proprietary and intended for educational or portfolio purposes. Use by permission only.
