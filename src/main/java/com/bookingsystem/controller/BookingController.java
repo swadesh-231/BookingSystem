@@ -16,13 +16,17 @@ public class BookingController {
     private final BookingService bookingService;
 
     @PostMapping("/init")
-    public ResponseEntity<BookingResponse> initialiseBooking(@RequestBody BookingRequest bookingRequest) {
+    public ResponseEntity<BookingResponse> initialiseBooking(
+            @RequestBody @jakarta.validation.Valid BookingRequest bookingRequest) {
         return ResponseEntity.ok(bookingService.initialiseBooking(bookingRequest));
     }
+
     @PostMapping("/{bookingId}/addguest")
-    public ResponseEntity<BookingResponse> addGuests(@PathVariable Long bookingId,@RequestBody List<GuestDto> guestList) {
+    public ResponseEntity<BookingResponse> addGuests(@PathVariable Long bookingId,
+            @RequestBody List<GuestDto> guestList) {
         return ResponseEntity.ok(bookingService.addGuests(bookingId, guestList));
     }
+
     @PostMapping("/{bookingId}/payments")
     public ResponseEntity<BookingPaymentInitResponse> initiatePayment(@PathVariable Long bookingId) {
         String sessionUrl = bookingService.initiatePayments(bookingId);
