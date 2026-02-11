@@ -27,6 +27,7 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
         http
+                .cors(org.springframework.security.config.Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -35,6 +36,7 @@ public class SecurityConfig {
                         .requestMatchers("/admin/**").hasRole("HOTEL_MANAGER")
                         .requestMatchers("/bookings/**").authenticated()
                         .requestMatchers("/users/**").authenticated()
+                        .requestMatchers("/actuator/**").permitAll()
                         .anyRequest().permitAll())
                 .exceptionHandling(exConfig -> exConfig
                         .authenticationEntryPoint(authEntryPointJwt)
