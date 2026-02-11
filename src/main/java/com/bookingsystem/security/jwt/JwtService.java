@@ -14,7 +14,7 @@ import java.util.Date;
 
 @Service
 public class JwtService {
-    @Value("${spring.app.secret}")
+    @Value("${spring.app.secret-key}")
     private String secret;
     @Value("${spring.app.expiration}")
     private Long expiration;

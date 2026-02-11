@@ -12,10 +12,28 @@ spring:
       ddl-auto: create-drop
 
   app:
-    secret: ${JWT_SECRET}
+    secret-key: ${JWT_SECRET}
     expiration: ${JWT_EXPIRATION}
     refreshtoken: ${JWT_REFRESH_TOKEN}
 
 server:
   servlet:
     context-path: ${SERVER_CONTEXT_PATH}
+
+
+  stripe:
+    secret:
+      key: ${STRIPE_KEY}
+
+    webhook:
+      secret: ${WEBHOOK_SECRET}
+
+
+
+
+  frontend:
+    url: http://localhost:8080
+
+
+
+
