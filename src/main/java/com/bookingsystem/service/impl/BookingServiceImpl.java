@@ -25,12 +25,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+
+import static com.bookingsystem.security.utils.AuthUtils.getCurrentUser;
 
 @Service
 @RequiredArgsConstructor
@@ -199,12 +203,11 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     public List<BookingResponse> getAllBookingsByHotelId(Long hotelId) {
-        Hotel hotel = hotelRepository.findById(hotelId).orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", hotelId));
+        Hotel hotel = hotelRepository.findById(hotelId).orElseThrow(() ->
+                new ResourceNotFoundException("Hotel", "id", hotelId));
         User user = getCurrentUser();
         if(!user.equals(hotel.getOwner())) throw new AccessDeniedException("You are not the owner of hotel with id: "+hotelId);
-
         List<Booking> bookings = bookingRepository.findByHotel(hotel);
-
         return bookings.stream()
                 .map((element) -> modelMapper.map(element, BookingResponse.class))
                 .collect(Collectors.toList());
@@ -212,19 +215,38 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     public HotelReport getHotelReport(Long hotelId, LocalDate startDate, LocalDate endDate) {
-        return null;
+        Hotel hotel = hotelRepository.findById(hotelId).orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", hotelId));
+        User user = getCurrentUser();
+        if(!user.equals(hotel.getOwner())) throw new AccessDeniedException("You are not the owner of hotel with id: "+hotelId);
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
+        List<Booking> bookings = bookingRepository.findByHotelAndCreatedAtBetween(hotel, startDateTime, endDateTime);
+        long totalConfirmedBookings = bookings
+                .stream()
+                .filter(booking -> booking.getStatus() == BookingStatus.CONFIRMED)
+                .count();
+
+        BigDecimal totalRevenueOfConfirmedBookings = bookings.stream()
+                .filter(booking -> booking.getStatus() == BookingStatus.CONFIRMED)
+                .map(Booking::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal avgRevenue = totalConfirmedBookings == 0 ? BigDecimal.ZERO :
+                totalRevenueOfConfirmedBookings.divide(BigDecimal.valueOf(totalConfirmedBookings), RoundingMode.HALF_UP);
+
+        return new HotelReport(totalConfirmedBookings, totalRevenueOfConfirmedBookings, avgRevenue);
     }
 
     @Override
     public List<BookingResponse> getMyBookings() {
-        return List.of();
+        User user = getCurrentUser();
+        return bookingRepository.findByUser(user)
+                .stream().
+                map((element) -> modelMapper.map(element, BookingResponse.class))
+                .collect(Collectors.toList());
     }
-
 
     public boolean hasBookingExpired(Booking booking) {
         return booking.getCreatedAt().plusMinutes(5).isBefore(LocalDateTime.now());
-    }
-    public User getCurrentUser() {
-        return (User) Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()).getPrincipal();
     }
 }

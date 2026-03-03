@@ -4,8 +4,12 @@ import com.bookingsystem.dto.*;
 import com.bookingsystem.entity.Hotel;
 import com.bookingsystem.entity.Inventory;
 import com.bookingsystem.entity.Room;
+import com.bookingsystem.entity.User;
+import com.bookingsystem.exception.AccessDeniedException;
+import com.bookingsystem.exception.ResourceNotFoundException;
 import com.bookingsystem.repository.HotelPriceRepository;
 import com.bookingsystem.repository.InventoryRepository;
+import com.bookingsystem.repository.RoomRepository;
 import com.bookingsystem.service.InventoryService;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
@@ -18,6 +22,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import static com.bookingsystem.security.utils.AuthUtils.getCurrentUser;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +33,7 @@ public class InventoryServiceImpl implements InventoryService {
     private final InventoryRepository inventoryRepository;
     private final ModelMapper modelMapper;
     private final HotelPriceRepository hotelPriceRepository;
+    private final RoomRepository roomRepository;
 
     @Override
     public void initializeRoomForAYear(Room room) {
@@ -56,6 +65,21 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     @Override
+    public List<InventoryResponse> getAllInventoriesByRoom(Long roomId) {
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new ResourceNotFoundException("Room","id",roomId));
+
+        User user = getCurrentUser();
+        if(!user.equals(room.getHotel().getOwner())) throw new AccessDeniedException("You are not the owner of room with id: "+roomId);
+//
+//        return inventoryRepository.findByRoomOrderByDate(room).stream()
+//                .map((element) -> modelMapper.map(element,
+//                        InventoryResponse.class))
+//                .collect(Collectors.toList());
+        return null;
+    }
+
+    @Override
     public Page<HotelPriceResponse> searchHotels(HotelSearchRequest hotelSearchRequest) {
         Pageable pageable = PageRequest.of(hotelSearchRequest.getPage(), hotelSearchRequest.getSize());
         long dateCount =
@@ -72,5 +96,10 @@ public class InventoryServiceImpl implements InventoryService {
             hotelPriceResponse.setPrice(hotelPriceDto.getPrice());
             return hotelPriceResponse;
         });
+    }
+
+    @Override
+    public void updateInventories(Long roomId, InventoryRequest inventoryRequest) {
+
     }
 }

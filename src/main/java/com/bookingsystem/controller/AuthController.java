@@ -20,14 +20,11 @@ import java.util.Arrays;
 @RequiredArgsConstructor
 @RequestMapping("/auth")
 public class AuthController {
-
     private final AuthService authService;
-
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> registerUser(@Valid @RequestBody RegisterRequest registerRequest) {
         return ResponseEntity.ok(authService.registerUser(registerRequest));
     }
-
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest loginRequest,
             HttpServletResponse response) {
@@ -39,7 +36,6 @@ public class AuthController {
         return ResponseEntity.ok(
                 new LoginResponse(loginResponse.getAccess_token(), null));
     }
-
     @PostMapping("/refresh-token")
     public ResponseEntity<LoginResponse> refreshToken(HttpServletRequest request) {
         String refreshToken = Arrays.stream(request.getCookies())

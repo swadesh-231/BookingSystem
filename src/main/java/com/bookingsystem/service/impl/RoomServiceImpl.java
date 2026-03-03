@@ -4,7 +4,9 @@ import com.bookingsystem.dto.RoomRequest;
 import com.bookingsystem.dto.RoomResponse;
 import com.bookingsystem.entity.Hotel;
 import com.bookingsystem.entity.Room;
+import com.bookingsystem.entity.User;
 import com.bookingsystem.exception.ResourceNotFoundException;
+import com.bookingsystem.exception.UnAuthorisedException;
 import com.bookingsystem.repository.HotelRepository;
 import com.bookingsystem.repository.RoomRepository;
 import com.bookingsystem.service.InventoryService;
@@ -15,6 +17,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+
+import static com.bookingsystem.security.utils.AuthUtils.getCurrentUser;
 
 @Service
 @RequiredArgsConstructor
@@ -64,9 +68,13 @@ public class RoomServiceImpl implements RoomService {
     }
 
     @Override
-    public RoomResponse updateRoomById(Long hotelId, Long roomId, RoomRequest roomRequest) {
+    public RoomResponse updateRoom(Long hotelId, Long roomId, RoomRequest roomRequest) {
         Hotel hotel = hotelRepository.findById(hotelId)
                 .orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", hotelId));
+        User user = getCurrentUser();
+        if(!user.equals(hotel.getOwner())) {
+            throw new UnAuthorisedException("This user does not own this hotel with id: "+hotelId);
+        }
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new ResourceNotFoundException("Room", "id", roomId));
         if (!room.getHotel().getId().equals(hotelId)) {

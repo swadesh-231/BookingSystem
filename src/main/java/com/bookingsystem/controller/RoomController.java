@@ -28,6 +28,10 @@ public class RoomController {
     public ResponseEntity<RoomResponse> getRoomById(@PathVariable Long hotelId, @PathVariable Long roomId) {
         return ResponseEntity.ok(roomService.getRoomById(roomId));
     }
+    @PutMapping("/{roomId}")
+    public ResponseEntity<RoomResponse> updateRooms(@PathVariable Long hotelId, @PathVariable Long roomId,@RequestBody RoomRequest roomRequest) {
+        return ResponseEntity.ok(roomService.updateRoom(roomId, hotelId, roomRequest));
+    }
     @DeleteMapping("/{roomId}")
     public ResponseEntity<Void> deleteRoomById(@PathVariable Long hotelId, @PathVariable Long roomId) {
         roomService.deleteRoomById(roomId);

@@ -1,13 +1,17 @@
 package com.bookingsystem.controller;
 
+import com.bookingsystem.dto.BookingResponse;
+import com.bookingsystem.dto.HotelReport;
 import com.bookingsystem.dto.HotelRequest;
 import com.bookingsystem.dto.HotelResponse;
+import com.bookingsystem.service.BookingService;
 import com.bookingsystem.service.HotelService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -15,6 +19,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class HotelController {
     private final HotelService hotelService;
+    private final BookingService bookingService;
 
     @PostMapping
     public ResponseEntity<HotelResponse> createNewHotel(@Valid @RequestBody HotelRequest hotelRequest) {
@@ -44,5 +49,17 @@ public class HotelController {
     public ResponseEntity<Void> deleteHotelById(@PathVariable Long hotelId) {
         hotelService.deleteHotelById(hotelId);
         return ResponseEntity.noContent().build();
+    }
+    @GetMapping("/{hotelId}/bookings")
+    public ResponseEntity<List<BookingResponse>> getBookingsByHotelId(@PathVariable Long hotelId) {
+        return ResponseEntity.ok(bookingService.getAllBookingsByHotelId(hotelId));
+    }
+    @GetMapping("/{hotelId}/report")
+    public ResponseEntity<HotelReport> getHotelReport(@PathVariable Long hotelId,
+                                                      @RequestParam(required = false) LocalDate startDate,
+                                                      @RequestParam(required = false) LocalDate endDate) {
+        if (startDate == null) startDate = LocalDate.now().minusMonths(1);
+        if (endDate == null) endDate = LocalDate.now();
+        return ResponseEntity.ok(bookingService.getHotelReport(hotelId, startDate, endDate));
     }
 }
