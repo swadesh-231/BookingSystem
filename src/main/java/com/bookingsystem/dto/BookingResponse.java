@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Set;
+import java.util.List;
 
 @Data
 @AllArgsConstructor
@@ -22,7 +22,7 @@ public class BookingResponse {
     private LocalDate checkOutDate;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    private BookingStatus bookingStatus;
-    private Set<GuestDto> guests;
+    private BookingStatus status;
+    private List<GuestDto> guests;
     private BigDecimal amount;
 }

@@ -20,6 +20,7 @@ public class Hotel {
     private Long id;
     @Column(nullable = false)
     private String name;
+    @Column(nullable = false)
     private String city;
     @Column(columnDefinition = "TEXT[]")
     private String[] photos;

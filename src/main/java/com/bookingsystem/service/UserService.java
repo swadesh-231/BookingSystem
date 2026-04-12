@@ -8,4 +8,5 @@ public interface UserService {
     User getUserById(Long id);
     void updateProfile(ProfileUpdateRequest profileUpdateRequest);
     UserDto getMyProfile();
+    void changePassword(String currentPassword, String newPassword);
 }

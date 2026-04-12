@@ -14,11 +14,16 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @Builder
-@Table(uniqueConstraints =
-@UniqueConstraint(
-        name = "unique_hotel_room_date",
-        columnNames = {"hotel_id", "room_id", "date"}
-))
+@Table(
+    uniqueConstraints = @UniqueConstraint(
+            name = "unique_hotel_room_date",
+            columnNames = {"hotel_id", "room_id", "date"}
+    ),
+    indexes = {
+            @Index(name = "idx_inventory_city_date", columnList = "city, date"),
+            @Index(name = "idx_inventory_room_date", columnList = "room_id, date")
+    }
+)
 public class Inventory {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

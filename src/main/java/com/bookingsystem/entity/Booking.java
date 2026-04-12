@@ -9,7 +9,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @AllArgsConstructor
@@ -17,6 +18,12 @@ import java.util.Set;
 @Getter
 @Setter
 @Builder
+@Table(indexes = {
+        @Index(name = "idx_booking_user", columnList = "user_id"),
+        @Index(name = "idx_booking_hotel", columnList = "hotel_id"),
+        @Index(name = "idx_booking_status", columnList = "status"),
+        @Index(name = "idx_booking_session", columnList = "paymentSessionId")
+})
 public class Booking {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -61,7 +68,8 @@ public class Booking {
             joinColumns = @JoinColumn(name = "booking_id"),
             inverseJoinColumns = @JoinColumn(name = "guest_id")
     )
-    private Set<Guest> guests;
+    @Builder.Default
+    private List<Guest> guests = new ArrayList<>();
 
     @Column(unique = true)
     private String paymentSessionId;

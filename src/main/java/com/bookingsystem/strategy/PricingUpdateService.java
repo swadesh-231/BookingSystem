@@ -7,6 +7,7 @@ import com.bookingsystem.repository.HotelPriceRepository;
 import com.bookingsystem.repository.HotelRepository;
 import com.bookingsystem.repository.InventoryRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -24,6 +25,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class PricingUpdateService {
     private final HotelRepository hotelRepository;
     private final InventoryRepository inventoryRepository;
@@ -32,16 +34,30 @@ public class PricingUpdateService {
 
     @Scheduled(cron = "0 0 * * * *")
     public void updatePrice(){
+        log.info("Starting scheduled price update");
         int page = 0;
         int batchSize = 100;
+        int updated = 0;
 
-        while(true) {
-            Page<Hotel> hotelPage = hotelRepository.findAll(PageRequest.of(page, batchSize));
-            if(hotelPage.isEmpty()) {
-                break;
+        try {
+            while(true) {
+                Page<Hotel> hotelPage = hotelRepository.findAll(PageRequest.of(page, batchSize));
+                if(hotelPage.isEmpty()) {
+                    break;
+                }
+                for (Hotel hotel : hotelPage.getContent()) {
+                    try {
+                        updateHotelPrices(hotel);
+                        updated++;
+                    } catch (Exception e) {
+                        log.error("Failed to update prices for hotel {}: {}", hotel.getId(), e.getMessage());
+                    }
+                }
+                page++;
             }
-            hotelPage.getContent().forEach(this::updateHotelPrices);
-            page++;
+            log.info("Completed scheduled price update for {} hotels", updated);
+        } catch (Exception e) {
+            log.error("Scheduled price update failed after processing {} hotels: {}", updated, e.getMessage());
         }
     }
     private void updateHotelPrices(Hotel hotel) {

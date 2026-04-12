@@ -1,659 +1,424 @@
+<div align="center">
 
-# 🏨 StayEase — Hotel Booking & Reservation Engine
+# StayEase
 
-**A production-grade, enterprise-ready hotel booking platform built with Spring Boot 4, featuring real-time inventory management, dynamic pricing strategies, Stripe payment integration, and JWT-based security.**
+### Hotel Booking & Reservation Engine
+
+A production-ready backend reservation engine for hotel booking, payment processing,
+and platform administration with real-time inventory management.
 
 ![Java](https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.0.2-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
 ![Stripe](https://img.shields.io/badge/Stripe-Payments-635BFF?style=for-the-badge&logo=stripe&logoColor=white)
-![JWT](https://img.shields.io/badge/JWT-Auth-000000?style=for-the-badge&logo=jsonwebtokens&logoColor=white)
+![Gradle](https://img.shields.io/badge/Gradle-Build-02303A?style=for-the-badge&logo=gradle&logoColor=white)
 
 </div>
 
 ---
 
-## 📑 Table of Contents
+## Table of Contents
 
-- [Project Overview](#-project-overview)
-- [Features](#-features)
-- [System Design Philosophy](#-system-design-philosophy)
-- [Architecture Overview](#-architecture-overview)
-- [Tech Stack](#-tech-stack)
-- [Folder Structure](#-folder-structure)
-- [Data Flow](#-data-flow)
-- [Database Design](#-database-design)
-- [Security](#-security)
-- [API Documentation](#-api-documentation)
-- [Performance & Scalability](#-performance--scalability)
-- [DevOps & Deployment](#-devops--deployment)
-- [Testing Strategy](#-testing-strategy)
-- [Monitoring & Logging](#-monitoring--logging)
-- [Future Improvements](#-future-improvements)
-- [Contribution Guide](#-contribution-guide)
-- [Setup & Installation](#-setup--installation)
-- [Environment Variables](#-environment-variables)
-- [Developer Guide](#-developer-guide)
-- [Business & Scaling Vision](#-business--scaling-vision)
+- [Overview](#overview)
+- [System Design](#system-design)
+- [Architecture](#architecture)
+- [API Reference](#api-reference)
+- [Booking Lifecycle](#booking-lifecycle)
+- [Database Schema](#database-schema)
+- [Security](#security)
+- [Tech Stack](#tech-stack)
+- [Getting Started](#getting-started)
+- [Configuration](#configuration)
+- [Production Deployment](#production-deployment)
+- [Tradeoffs & Limitations](#tradeoffs--limitations)
+- [Scaling Strategy](#scaling-strategy)
 
 ---
 
-## 🚀 Project Overview
+## Overview
 
-### The Problem
-The hospitality industry needs reliable, scalable booking systems that handle real-time room availability, dynamic pricing, concurrent reservations, and secure payment processing — without overbooking or data races.
+StayEase is a backend reservation engine that handles the complete hotel booking lifecycle:
 
-### What StayEase Solves
-StayEase is a **backend reservation engine** that manages the full lifecycle of hotel bookings — from hotel/room onboarding by managers, to guest search, reservation with pessimistic inventory locking, multi-strategy dynamic pricing, Stripe checkout, webhook-driven payment confirmation, and automated refunds on cancellation.
-
-### Target Users
-| Role | Description |
-|------|-------------|
-| **Guests** | Search hotels by city/dates, book rooms, manage bookings |
-| **Hotel Managers** | Onboard hotels, manage rooms, activate/deactivate listings, view booking reports |
-| **Platform Operators** | Monitor system health via Actuator, manage pricing strategies |
-
-### Business Value
-- **Zero overbooking** via pessimistic database locking on inventory
-- **Revenue optimization** via multi-layered dynamic pricing (surge, occupancy, urgency, holiday)
-- **Secure payments** via Stripe Checkout with webhook-driven confirmation
-- **Scalable architecture** with clean layered design ready for microservice extraction
+- **Hotel Onboarding** -- Managers register hotels, define room types, and manage inventory
+- **Search & Discovery** -- Guests search available hotels by city, dates, and room count with dynamic pricing
+- **Booking & Payment** -- Pessimistic inventory locking ensures no overbooking; Stripe handles payments
+- **Platform Administration** -- Admins manage users, oversee all hotels, and monitor platform-wide metrics
 
 ---
 
-## 🎯 Features
+## System Design
 
-### Functional Features
-- ✅ User registration & login with JWT access + refresh tokens
-- ✅ Hotel CRUD with ownership validation (only owner can modify)
-- ✅ Room management tied to hotels with automatic inventory generation
-- ✅ Hotel search by city, dates, and room count with paginated results
-- ✅ Multi-step booking: Reserve → Add Guests → Pay → Confirm
-- ✅ 5-minute reservation expiry window to prevent inventory hoarding
-- ✅ Stripe Checkout payment with success/failure redirects
-- ✅ Stripe Webhook for server-side payment confirmation
-- ✅ Booking cancellation with automated Stripe refund
-- ✅ Guest management per booking
+### Concurrency & Inventory Locking
 
-### Technical Capabilities
-- 🔒 Pessimistic write locking on inventory for concurrency safety
-- 💰 Decorator-pattern dynamic pricing engine (4 chained strategies)
-- ⏰ Scheduled hourly price recalculation via Spring `@Scheduled`
-- 🍪 Refresh token stored in HttpOnly secure cookie (XSS-resistant)
-- 🛡️ Role-based access control (`GUEST`, `HOTEL_MANAGER`)
-- 📊 Spring Actuator health/metrics/info endpoints
-- 🔄 Transactional inventory management with reserve/confirm/cancel flows
+Hotel inventory is a high-contention resource. Two users booking the last room at the same time must never both succeed.
 
----
+StayEase uses **pessimistic write locks** (`SELECT ... FOR UPDATE`) on inventory rows during reservation. This trades throughput for absolute correctness -- no overbooking is possible, even under concurrent load.
 
-## 🧠 System Design Philosophy
+### Two-Phase Inventory Model
 
-### Architecture Principles
-| Principle | Implementation |
-|-----------|----------------|
-| **Layered Architecture** | Controller → Service → Repository with strict dependency direction |
-| **Interface Segregation** | Every service has an interface; implementations are injectable |
-| **Decorator Pattern** | Pricing strategies are chained decorators (Base → Surge → Occupancy → Urgency → Holiday) |
-| **DDD Lite** | Domain entities encapsulate business rules; enums model state machines |
-| **Fail-Fast** | Custom exceptions with `@RestControllerAdvice` global handler |
-| **Separation of Concerns** | Auth logic isolated in `security` package; payment logic in `TransactionalService` |
+Bookings follow a reserve-then-confirm cycle:
 
-### Key Design Decisions
+| Phase | Action | Inventory Effect |
+|-------|--------|-----------------|
+| **Reserve** | User initiates booking | `reservedCount` incremented, configurable TTL starts |
+| **Confirm** | Stripe webhook fires on payment success | `reservedCount` decremented, `bookedCount` incremented |
+| **Cancel** | User cancels or TTL expires | Counts reverted, Stripe refund issued if paid |
 
-**1. Pessimistic Locking over Optimistic Locking**
-> Hotel inventory is a high-contention resource. Pessimistic `WRITE` locks on inventory rows prevent double-booking at the database level — accepting slightly lower throughput for absolute data correctness.
+A **scheduled cleanup job** (60s `fixedDelay`) expires stale reservations with per-booking error isolation -- one failure never blocks the batch.
 
-**2. Decorator Pattern for Pricing**
-> Rather than a monolithic pricing calculator with conditional branches, each pricing strategy wraps the previous one. This makes it trivial to add/remove/reorder pricing rules without touching existing code (Open/Closed Principle).
+### Dynamic Pricing Engine
 
-**3. Webhook-Driven Payment Confirmation**
-> Instead of polling Stripe for payment status, the system uses a webhook endpoint with Stripe signature verification. This ensures reliable, event-driven payment confirmation even if the user closes their browser.
-
-**4. Two-Phase Inventory (Reserve → Confirm)**
-> Bookings first *reserve* inventory (decrementing available count), then upon payment confirmation *confirm* it (moving from reserved to booked). Cancellation reverses the booked count. This prevents ghost bookings from holding inventory indefinitely.
-
----
-
-## 🏗️ Architecture Overview
-
-### High-Level System Design
+Prices flow through a decorator chain of strategies:
 
 ```
-┌──────────────┐     ┌───────────────────────────────────────────────────────┐
-│   Frontend   │────▶│                  API Gateway (/api/v1)                │
-│  (React/Any) │◀────│                                                       │
-└──────────────┘     └───────┬───────────────────────────────────┬───────────┘
-                             │                                   │
-                    ┌────────▼────────┐                ┌────────▼────────┐
-                    │  Auth Module    │                │  Booking Module  │
-                    │  ┌────────────┐ │                │  ┌────────────┐ │
-                    │  │ JWT Filter │ │                │  │ Controller │ │
-                    │  │ JWT Service│ │                │  │ Service    │ │
-                    │  │ Auth Svc   │ │                │  │ Repository │ │
-                    │  └────────────┘ │                │  └────────────┘ │
-                    └────────┬────────┘                └────────┬────────┘
-                             │                                   │
-         ┌───────────────────┼───────────────────────────────────┤
-         │                   │                                   │
-┌────────▼────────┐ ┌───────▼────────┐  ┌───────────────┐ ┌────▼──────────┐
-│  Hotel Module   │ │ Inventory Mgmt │  │ Pricing Engine│ │ Stripe Payment│
-│  ┌────────────┐ │ │ ┌────────────┐ │  │ ┌───────────┐ │ │ ┌───────────┐ │
-│  │ Hotels     │ │ │ │ Pessimistic│ │  │ │ Base      │ │ │ │ Checkout  │ │
-│  │ Rooms      │ │ │ │ Locking    │ │  │ │ Surge     │ │ │ │ Webhook   │ │
-│  │ Activation │ │ │ │ Reserve    │ │  │ │ Occupancy │ │ │ │ Refund    │ │
-│  └────────────┘ │ │ │ Confirm    │ │  │ │ Urgency   │ │ │ └───────────┘ │
-└─────────────────┘ │ │ Cancel     │ │  │ │ Holiday   │ │ └───────────────┘
-                    │ └────────────┘ │  │ └───────────┘ │
-                    └───────┬────────┘  └───────┬───────┘
-                            │                   │
-                    ┌───────▼───────────────────▼───────┐
-                    │         PostgreSQL Database        │
-                    │  users | hotels | rooms | booking  │
-                    │  inventory | guests | hotel_price  │
-                    └───────────────────────────────────┘
+Base Price --> Surge Factor --> Occupancy (+20% at >80%) --> Urgency (+15% within 7 days) --> Holiday (+25%)
 ```
 
-### Request Flow
+An hourly `@Scheduled` batch job recalculates prices across all hotels (100 per page) and writes results to a precomputed `hotel_price` table for sub-millisecond search queries.
+
+### Webhook-Driven Payments
+
+Payment confirmation relies on Stripe webhooks with **signature verification** -- not client-side redirects. The handler is **idempotent**: duplicate `checkout.session.completed` events are safely ignored.
+
+---
+
+## Architecture
+
 ```
-Client Request → CORS Filter → JWT Auth Filter → Security Chain
-    → Controller → Service (Business Logic) → Repository (JPA/JPQL)
-    → PostgreSQL → Response DTO → JSON Response
+                                    +-------------------+
+                                    |   Stripe API      |
+                                    | (payments/refunds)|
+                                    +--------+----------+
+                                             |
+Client --> CORS --> JWT Filter --> Security Chain --> Controllers --> Services --> Repositories --> PostgreSQL
+                        |                                  |
+                  Security Headers                   Pricing Engine
+              (HSTS, X-Frame, X-Content)          (Decorator Pattern)
+```
+
+**Layers:**
+
+| Layer | Responsibility |
+|-------|---------------|
+| **Controller** | HTTP mapping, request validation, response formatting |
+| **Service** | Business rules, authorization checks, transaction boundaries |
+| **Repository** | JPA queries, custom JPQL with pessimistic locking |
+| **Strategy** | Decorator-pattern pricing engine, decoupled from booking flow |
+
+**Package Layout:**
+
+```
+com.bookingsystem/
+  config/           ProjectConfig, PasswordEncoderConfig, StripeConfig, WebConfig, OpenApiConfig
+  controller/       Admin, Auth, Booking, Hotel, HotelSearch, Room, Inventory, User, Webhook
+  dto/              Request/Response DTOs with Jakarta Bean Validation
+  entity/           JPA entities (User, Hotel, Room, Booking, Inventory, Guest, HotelPrice)
+  entity/enums/     Role, Gender, BookingStatus, PaymentStatus
+  exception/        Custom exceptions + GlobalExceptionHandler
+  repository/       Spring Data JPA interfaces with custom queries
+  security/         SecurityConfig, JWT filter & service, AuthUtils
+  service/          Interfaces + impl/ (Admin, Booking, Hotel, Inventory, Room, User)
+  strategy/         PricingStrategy chain + PricingUpdateService (scheduled)
 ```
 
 ---
 
-## ⚙️ Tech Stack
+## API Reference
 
-| Layer | Technology | Why This Choice |
-|-------|-----------|-----------------|
-| **Runtime** | Java 21 | LTS with virtual threads, pattern matching, sealed classes |
-| **Framework** | Spring Boot 4.0.2 | Latest Spring Boot with best-in-class DI, auto-config, and ecosystem |
-| **ORM** | Spring Data JPA + Hibernate | Declarative repositories, JPQL for complex queries, pessimistic locking |
-| **Database** | PostgreSQL | ACID compliance, `TEXT[]` arrays for amenities/photos, robust locking |
-| **Auth** | Spring Security + JJWT 0.13 | Stateless JWT auth with industry-standard HMAC-SHA signing |
-| **Payments** | Stripe Java SDK 31.3 | PCI-compliant payment processing, webhook support, refund API |
-| **Validation** | Jakarta Validation | Annotation-driven request validation (`@Valid`, `@NotBlank`, `@Email`) |
-| **Mapping** | ModelMapper 3.2.6 | Automatic DTO↔Entity conversion reducing boilerplate |
-| **Config** | java-dotenv 5.2.2 | 12-factor app env variable management |
-| **Build** | Gradle (Groovy DSL) | Fast incremental builds, dependency management |
-| **Monitoring** | Spring Actuator | Health checks, metrics, info endpoints for observability |
-| **Boilerplate** | Lombok | `@Getter`, `@Setter`, `@Builder`, `@RequiredArgsConstructor` |
+> Base path: **`/api/v1`**
+>
+> Interactive docs: **`/api/v1/swagger-ui.html`**
 
----
+### Authentication (`/auth`) -- Public
 
-## 📂 Folder Structure
-
-```
-src/main/java/com/bookingsystem/
-├── BookingSystemApplication.java    # Application entry point
-├── config/
-│   ├── ProjectConfig.java           # Bean definitions (ModelMapper)
-│   ├── StripeConfig.java            # Stripe API key initialization
-│   └── WebConfig.java               # CORS configuration
-├── controller/
-│   ├── AuthController.java          # Register, Login, Refresh Token
-│   ├── BookingController.java       # Init, Add Guests, Pay, Cancel, Status
-│   ├── HotelController.java         # CRUD for hotel managers (/admin/hotel)
-│   ├── HotelSearchController.java   # Public hotel search (/hotels)
-│   ├── RoomController.java          # Room CRUD per hotel (/admin/hotels/{id}/rooms)
-│   └── WebhookController.java       # Stripe payment webhook (/webhooks/payment)
-├── dto/                             # 22 Request/Response DTOs
-│   ├── BookingRequest/Response.java
-│   ├── HotelRequest/Response.java
-│   ├── LoginRequest/Response.java
-│   ├── RegisterRequest.java
-│   ├── HotelSearchRequest/Response.java
-│   └── ...
-├── entity/
-│   ├── Booking.java                 # Core booking with state machine
-│   ├── Guest.java                   # Guest info per booking
-│   ├── Hotel.java                   # Hotel with embedded contact, photos, amenities
-│   ├── HotelContact.java           # @Embeddable contact (address, phone, email, location)
-│   ├── HotelPrice.java             # Precomputed daily hotel min-price
-│   ├── Inventory.java              # Per-room per-date availability with surge factor
-│   ├── Room.java                   # Room type, price, capacity, photos
-│   ├── User.java                   # Implements UserDetails for Spring Security
-│   └── enums/                      # BookingStatus, Gender, PaymentStatus, Role
-├── exception/
-│   ├── GlobalExceptionHandler.java  # @RestControllerAdvice — centralized error handling
-│   ├── ResourceNotFoundException.java
-│   ├── RoomNotAvailableException.java
-│   ├── BookingExpiredException.java
-│   ├── UnAuthorisedException.java
-│   └── ...                          # 11 custom exception classes
-├── repository/                      # 7 JPA repositories
-│   ├── InventoryRepository.java     # Complex JPQL with pessimistic locking
-│   ├── HotelPriceRepository.java    # Aggregation queries for search
-│   └── ...
-├── security/
-│   ├── SecurityConfig.java          # Filter chain, RBAC rules, CORS, CSRF
-│   ├── jwt/
-│   │   ├── JwtAuthFilter.java       # OncePerRequestFilter for token extraction
-│   │   └── JwtService.java          # Token generation, validation, parsing
-│   └── service/
-│       ├── AuthService.java
-│       └── impl/AuthServiceImpl.java
-├── service/
-│   ├── BookingService.java          # + impl with full booking lifecycle
-│   ├── HotelService.java           # + impl with ownership validation
-│   ├── InventoryService.java       # + impl with year-long inventory init
-│   ├── RoomService.java            # + impl with auto-inventory on create
-│   ├── TransactionalService.java   # + impl for Stripe Checkout session
-│   └── UserService.java           # + impl with UserDetailsService
-└── strategy/
-    ├── PricingStrategy.java         # Interface (Decorator pattern)
-    ├── PricingService.java          # Chains all strategies
-    ├── PricingUpdateService.java    # @Scheduled hourly batch price update
-    └── impl/
-        ├── BasePricingStrategy.java      # Room base price
-        ├── SurgePricingStrategy.java     # Multiplies by surge factor
-        ├── OccupancyPricingStrategy.java # +20% when >80% occupancy
-        ├── UrgencyPricingStrategy.java   # +15% for bookings within 7 days
-        └── HolidayPricingStrategy.java   # +25% on holidays (stub)
-```
-
----
-
-## 🔄 Data Flow
-
-### Booking Lifecycle (State Machine)
-
-```
-    ┌──────────┐  POST /bookings/init   ┌─────────────┐
-    │  START   │───────────────────────▶│  RESERVED   │
-    └──────────┘                        └──────┬──────┘
-                                               │ POST /bookings/{id}/addguest
-                                        ┌──────▼──────┐
-                                        │ GUEST_ADDED │
-                                        └──────┬──────┘
-                                               │ POST /bookings/{id}/payments
-                                       ┌───────▼────────┐
-                                       │PAYMENT_PENDING │
-                                       └───────┬────────┘
-            ┌──────────────────────────────────┼──────────────────┐
-            │ Stripe Webhook (success)         │                  │ Timeout/Failure
-     ┌──────▼──────┐                           │           ┌──────▼──────┐
-     │  CONFIRMED  │                           │           │  EXPIRED    │
-     └──────┬──────┘                           │           └─────────────┘
-            │ POST /bookings/{id}/cancel       │
-     ┌──────▼──────┐                           │
-     │  CANCELLED  │ (+ Stripe Refund)         │
-     └─────────────┘                           │
-```
-
-### Authentication Flow
-1. **Register** → `POST /auth/register` → BCrypt hash → Save User with `GUEST` role
-2. **Login** → `POST /auth/login` → AuthenticationManager validates → Generate access token (5 min) + refresh token (7 days in HttpOnly cookie)
-3. **Authenticated Request** → `Authorization: Bearer <token>` → `JwtAuthFilter` extracts userId → Loads User → Sets SecurityContext
-4. **Token Refresh** → `POST /auth/refresh-token` → Reads cookie → Validates refresh token → Issues new access token
-
----
-
-## 🧱 Database Design
-
-### Entity Relationship Diagram
-
-```
-┌──────────┐     ┌──────────┐     ┌───────────┐
-│  users   │────▶│  hotels  │────▶│   rooms   │
-│──────────│  1:N│──────────│  1:N│───────────│
-│ id (PK)  │     │ id (PK)  │     │ id (PK)   │
-│ name     │     │ name     │     │ hotel_id  │
-│ email    │     │ city     │     │ type      │
-│ password │     │ photos[] │     │ basePrice │
-│ roles    │     │ amenities│     │ capacity  │
-└──────────┘     │ owner_id │     │ totalCount│
-                 │ active   │     └─────┬─────┘
-                 └──────────┘           │ 1:N
-                      │ 1:N      ┌──────▼──────┐
-                 ┌────▼─────┐    │  inventory  │
-                 │ booking  │    │─────────────│
-                 │──────────│    │ hotel_id    │
-                 │ hotel_id │    │ room_id     │
-                 │ room_id  │    │ date        │
-                 │ user_id  │    │ bookedCount │
-                 │ checkIn  │    │ reservedCnt │
-                 │ checkOut │    │ totalCount  │
-                 │ amount   │    │ surgeFactor │
-                 │ status   │    │ price       │
-                 │ sessionId│    │ city        │
-                 └────┬─────┘    │ closed      │
-                      │ M:N     └─────────────┘
-                 ┌────▼─────┐    UNIQUE(hotel_id, room_id, date)
-                 │  guests  │
-                 │──────────│
-                 │ name     │
-                 │ gender   │
-                 │ dob      │
-                 └──────────┘
-```
-
-### Key Design Choices
-- **Inventory table with unique constraint** `(hotel_id, room_id, date)` — one row per room-type per day
-- **Pessimistic write locks** on inventory queries prevent concurrent overbooking
-- **`TEXT[]` PostgreSQL arrays** for photos/amenities — avoids extra join tables
-- **`HotelPrice` precomputed table** — daily minimum prices per hotel for fast search queries
-- **Two-counter system**: `reservedCount` (pending payment) + `bookedCount` (confirmed) enable precise availability tracking
-
----
-
-## 🔐 Security
-
-| Aspect | Implementation |
-|--------|---------------|
-| **Authentication** | JWT (JJWT 0.13) with HMAC-SHA signing |
-| **Access Token** | 5-minute expiry, sent via `Authorization: Bearer` header |
-| **Refresh Token** | 7-day expiry, stored in `HttpOnly` + `Secure` cookie (XSS-proof) |
-| **Password Storage** | BCrypt hashing via `BCryptPasswordEncoder` |
-| **RBAC** | `GUEST` and `HOTEL_MANAGER` roles; `/admin/**` restricted to managers |
-| **CORS** | Whitelisted origins (`localhost:3000`, `localhost:5173`) |
-| **CSRF** | Disabled (stateless JWT-based API) |
-| **Session** | `STATELESS` — no server-side session storage |
-| **Webhook Security** | Stripe signature verification via `Webhook.constructEvent()` |
-| **Auth Entry Point** | Custom `AuthEntryPointJwt` for 401 responses |
-| **Ownership Validation** | Every hotel/booking mutation verifies requesting user is the owner |
-
----
-
-## 📡 API Documentation
-
-### Base URL: `/api/v1`
-
-### Authentication
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| `POST` | `/auth/register` | Public | Register new user |
-| `POST` | `/auth/login` | Public | Login, returns access token + refresh cookie |
-| `POST` | `/auth/refresh-token` | Cookie | Refresh access token |
-
-### Hotel Management (HOTEL_MANAGER only)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/admin/hotel` | Create hotel |
-| `GET` | `/admin/hotel` | List all hotels |
-| `GET` | `/admin/hotel/{id}` | Get hotel by ID |
+| `POST` | `/auth/register` | Register new user with `GUEST` role |
+| `POST` | `/auth/login` | Returns access token; sets refresh token as HttpOnly cookie |
+| `POST` | `/auth/refresh-token` | Issues new access token using refresh cookie |
+| `POST` | `/auth/logout` | Clears refresh token cookie |
+
+### User Profile (`/users`) -- Authenticated
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/users/profile` | Get current user's profile |
+| `PUT` | `/users/profile` | Update name, gender, or date of birth |
+| `PUT` | `/users/change-password` | Change password (requires current password) |
+
+### Hotel Management (`/admin/hotel`) -- HOTEL_MANAGER
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/admin/hotel` | Create hotel (inactive by default) |
+| `GET` | `/admin/hotel` | List own hotels |
+| `GET` | `/admin/hotel/{id}` | Get hotel details |
 | `PUT` | `/admin/hotel/{id}` | Update hotel |
-| `PATCH` | `/admin/hotel/{id}/status?status=true` | Activate/deactivate |
-| `DELETE` | `/admin/hotel/{id}` | Delete hotel + rooms + inventory |
+| `PATCH` | `/admin/hotel/{id}/status?status=true` | Activate/deactivate (initializes or clears inventory) |
+| `DELETE` | `/admin/hotel/{id}` | Delete hotel, rooms, and inventory |
+| `GET` | `/admin/hotel/{id}/bookings` | List hotel's bookings |
+| `GET` | `/admin/hotel/{id}/report` | Revenue report (optional `startDate` & `endDate`) |
 
-### Room Management (HOTEL_MANAGER only)
+### Room Management (`/admin/hotels/{hotelId}/rooms`) -- HOTEL_MANAGER
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/admin/hotels/{hotelId}/rooms` | Create room (auto-generates 1yr inventory if hotel active) |
-| `GET` | `/admin/hotels/{hotelId}/rooms` | List rooms in hotel |
-| `GET` | `/admin/hotels/{hotelId}/rooms/{roomId}` | Get room |
-| `DELETE` | `/admin/hotels/{hotelId}/rooms/{roomId}` | Delete room + inventory |
+| `POST` | `/admin/hotels/{hotelId}/rooms` | Create room type (auto-generates 1-year inventory if active) |
+| `GET` | `/admin/hotels/{hotelId}/rooms` | List all rooms in hotel |
+| `GET` | `/admin/hotels/{hotelId}/rooms/{roomId}` | Get room details |
+| `PUT` | `/admin/hotels/{hotelId}/rooms/{roomId}` | Update room |
+| `DELETE` | `/admin/hotels/{hotelId}/rooms/{roomId}` | Delete room and inventory |
 
-### Hotel Search (Public)
+### Inventory Management (`/admin/inventory`) -- HOTEL_MANAGER
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/hotels/search` | Search available hotels (paginated) |
-| `GET` | `/hotels/{hotelId}/info` | Get hotel details with rooms |
+| `GET` | `/admin/inventory/rooms/{roomId}` | View room inventory by date |
+| `PUT` | `/admin/inventory/rooms/{roomId}` | Bulk update surge factor or close dates |
 
-### Bookings (Authenticated)
+### Platform Administration (`/admin/platform`) -- ADMIN
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/bookings/init` | Initialize booking (reserves inventory) |
-| `POST` | `/bookings/{id}/addguest` | Add guest details |
-| `POST` | `/bookings/{id}/payments` | Initiate Stripe Checkout |
-| `POST` | `/bookings/{id}/cancel` | Cancel + refund |
-| `GET` | `/bookings/{id}/status` | Check booking status |
+| `GET` | `/admin/platform/users?page=0&size=20` | List all users (paginated, max 100/page) |
+| `GET` | `/admin/platform/users/{userId}` | Get user details with roles |
+| `PUT` | `/admin/platform/users/{userId}/roles` | Update user roles |
+| `DELETE` | `/admin/platform/users/{userId}` | Delete user account |
+| `GET` | `/admin/platform/hotels?page=0&size=20` | List all hotels (paginated) |
+| `PATCH` | `/admin/platform/hotels/{hotelId}/status?active=true` | Activate/deactivate any hotel |
+| `GET` | `/admin/platform/bookings?page=0&size=20` | List all bookings (paginated) |
+| `GET` | `/admin/platform/stats` | Platform statistics (users, hotels, bookings, revenue) |
 
-### Webhooks (Stripe)
+### Hotel Search (`/hotels`) -- Public
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/webhooks/payment` | Stripe payment confirmation |
+| `GET` | `/hotels/search` | Search by city, dates, room count (paginated, validated) |
+| `GET` | `/hotels/{hotelId}/info` | Hotel details with all room types |
 
-### Sample Request/Response
+### Bookings (`/bookings`) -- Authenticated
 
-**POST `/auth/register`**
-```json
-// Request
-{ "name": "John Doe", "email": "john@example.com", "password": "SecureP@ss123" }
-// Response 200
-{ "message": "User registered successfully!" }
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/bookings/init` | Reserve rooms with pessimistic lock (starts TTL countdown) |
+| `POST` | `/bookings/{id}/addguest` | Add guest details to reservation |
+| `POST` | `/bookings/{id}/payments` | Create Stripe Checkout session |
+| `POST` | `/bookings/{id}/cancel` | Cancel booking (releases inventory; refunds if confirmed) |
+| `GET` | `/bookings/{id}/status` | Get current booking status |
+| `GET` | `/bookings/my-bookings` | List authenticated user's bookings |
 
-**POST `/bookings/init`**
-```json
-// Request
-{ "hotelId": 1, "roomId": 3, "checkInDate": "2026-03-15", "checkOutDate": "2026-03-18", "roomsCount": 2 }
-// Response 200
-{ "id": 42, "hotelId": 1, "roomId": 3, "checkInDate": "2026-03-15",
-  "checkOutDate": "2026-03-18", "roomsCount": 2, "amount": 15600.00, "status": "RESERVED" }
-```
+### Webhooks (`/webhooks`) -- Stripe Only
 
----
-
-## ⚡ Performance & Scalability
-
-| Strategy | Implementation |
-|----------|---------------|
-| **Concurrency Control** | `@Lock(PESSIMISTIC_WRITE)` on inventory queries prevents race conditions |
-| **Batch Processing** | `PricingUpdateService` processes hotels in pages of 100 to avoid OOM |
-| **Pagination** | Hotel search uses `PageRequest` for cursor-based result sets |
-| **Lazy Loading** | `FetchType.LAZY` on all `@ManyToOne` relations to prevent N+1 queries |
-| **Precomputed Prices** | `HotelPrice` table stores daily min-prices — search queries avoid real-time computation |
-| **Scheduled Updates** | Hourly cron (`0 0 * * * *`) recalculates dynamic prices in background |
-| **Stateless Auth** | No server session storage; horizontal scaling without sticky sessions |
-| **Bulk Saves** | `saveAll()` for inventory initialization and price updates |
-
-### Scaling Roadmap
-- **Read Replicas** → Route search queries to PostgreSQL replicas
-- **Redis Caching** → Cache hotel search results and hotel info
-- **Message Queue** → Decouple payment confirmation via Kafka/RabbitMQ
-- **Connection Pooling** → HikariCP tuning for high-concurrency workloads
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/webhooks/payment` | Stripe payment confirmation (signature-verified, idempotent) |
 
 ---
 
-## 🛠️ DevOps & Deployment
+## Booking Lifecycle
 
-### Environment Configuration
 ```
-.env (local)          → Environment-specific variables
-application.yaml      → Spring config with ${VAR} placeholders
-```
-
-### Containerization (Recommended)
-```dockerfile
-FROM eclipse-temurin:21-jre-alpine
-WORKDIR /app
-COPY build/libs/BookingSystem-0.0.1-SNAPSHOT.jar app.jar
-EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+                          +--- cancel ---+
+                          |              |
+RESERVED ──> GUEST_ADDED ──> PAYMENT_PENDING ──> CONFIRMED
+    |                                                 |
+    +------------ TTL expires ───> CANCELLED <── cancel (+ refund)
 ```
 
-### Monitoring
-- **Health Check**: `GET /api/v1/actuator/health` (show-details: always)
-- **Metrics**: `GET /api/v1/actuator/metrics`
-- **Info**: `GET /api/v1/actuator/info`
+| Status | Inventory | Trigger |
+|--------|-----------|---------|
+| `RESERVED` | `reservedCount++` | `POST /bookings/init` |
+| `GUEST_ADDED` | No change | `POST /bookings/{id}/addguest` |
+| `PAYMENT_PENDING` | No change | `POST /bookings/{id}/payments` |
+| `CONFIRMED` | `reservedCount--`, `bookedCount++` | Stripe webhook |
+| `CANCELLED` | Counts reverted | User cancel, TTL expiry, or cancel after confirm (+ refund) |
 
 ---
 
-## 🧪 Testing Strategy
+## Database Schema
 
-| Type | Tool | Status |
-|------|------|--------|
-| **Unit Tests** | JUnit 5 + Spring Test | Foundation in place |
-| **Security Tests** | Spring Security Test | Available via dependency |
-| **Integration Tests** | Spring Boot Test | `BookingSystemApplicationTests` configured |
-
-### Recommended Additions
-- **Testcontainers** for PostgreSQL integration tests
-- **Mockito** for service layer unit tests
-- **REST Assured** for API contract testing
-- **JMeter/Gatling** for load testing the booking flow under concurrency
-
----
-
-## 📊 Monitoring & Logging
-
-| Component | Details |
-|-----------|---------|
-| **Health Endpoint** | `/actuator/health` with `show-details: always` |
-| **Metrics** | `/actuator/metrics` — JVM, HTTP, Hikari pool stats |
-| **Logging** | Spring Boot default (Logback) — `application.yaml` configurable |
-
-### Recommended Observability Stack
-- **ELK Stack** (Elasticsearch + Logstash + Kibana) for centralized log aggregation
-- **Prometheus + Grafana** for metrics dashboards (Actuator metrics are Prometheus-compatible)
-- **Sentry** for exception tracking and alerting
-
----
-
-## 🚧 Future Improvements
-
-| Priority | Improvement | Impact |
-|----------|-------------|--------|
-| 🔴 High | Implement `getMyBookings()` and `getHotelReport()` (currently stubs) | User-facing feature |
-| 🔴 High | Implement `updateProfile()` in UserService | User profile management |
-| 🔴 High | Holiday calendar integration in `HolidayPricingStrategy` | Revenue optimization |
-| 🟡 Medium | Add Redis caching for hotel search and room info | Latency reduction |
-| 🟡 Medium | Implement email notifications (booking confirmation, cancellation) | User experience |
-| 🟡 Medium | Add rate limiting on auth endpoints | Security hardening |
-| 🟡 Medium | Switch `ddl-auto` from `create-drop` to `validate` + Flyway migrations | Production-readiness |
-| 🟢 Low | Add Swagger/OpenAPI documentation (`springdoc-openapi`) | Developer experience |
-| 🟢 Low | Implement image upload for hotel/room photos (S3 integration) | Feature completeness |
-| 🟢 Low | Multi-currency support in Stripe (currently INR only) | International expansion |
-
----
-
-## 🤝 Contribution Guide
-
-### Branch Strategy
 ```
-main        → Production-ready code
-develop     → Integration branch
-feature/*   → Feature branches (e.g., feature/redis-caching)
-hotfix/*    → Critical production fixes
+users ─────┬──── hotels ──── rooms ──── inventory
+            |       |                     (unique: hotel_id + room_id + date)
+            |       |                     (pessimistic lock target)
+            |       |
+            |       └──── hotel_price     (precomputed daily min-price for search)
+            |
+            └──── bookings ──── guests    (many-to-many)
 ```
 
-### PR Rules
-1. All PRs must target `develop` branch
-2. Minimum 1 code review approval required
-3. All existing tests must pass
-4. New features must include unit tests
-5. Follow existing package structure and naming conventions
+**Key Indexes:**
 
-### Coding Standards
-- **Naming**: `PascalCase` for classes, `camelCase` for methods/variables
-- **DTOs**: Separate Request/Response DTOs — never expose entities directly
-- **Services**: Always code to interfaces (`XService` + `XServiceImpl`)
-- **Validation**: Use Jakarta validation annotations on DTOs
-- **Exceptions**: Create custom exceptions; handle in `GlobalExceptionHandler`
+| Index | Purpose |
+|-------|---------|
+| `inventory(city, date)` | Hotel search performance |
+| `inventory(room_id, date)` | Booking reservation queries |
+| `booking(user_id)` | User's booking history |
+| `booking(hotel_id)` | Hotel's booking list |
+| `booking(status)` | Status-based filtering |
+| `booking(paymentSessionId)` | Stripe webhook lookup |
 
 ---
 
-## 🧾 Setup & Installation
+## Security
+
+| Layer | Implementation |
+|-------|---------------|
+| **Authentication** | JWT access tokens (JJWT 0.13, HMAC-SHA) |
+| **Token refresh** | HttpOnly + Secure + SameSite=Strict cookie, scoped to `/api/v1/auth` |
+| **Password storage** | BCrypt hashing with strength-validated input |
+| **Authorization** | Role-based: `GUEST`, `HOTEL_MANAGER`, `ADMIN` |
+| **Resource ownership** | Every mutation verifies the requesting user owns the resource |
+| **HTTP headers** | X-Frame-Options: DENY, X-Content-Type-Options: nosniff, HSTS (1 year) |
+| **CORS** | Configurable allowed origins via `CORS_ALLOWED_ORIGINS` env var |
+| **Input validation** | Jakarta Bean Validation on all request DTOs with `@Valid` |
+| **Error responses** | Sanitized messages -- no internal IDs or stack traces leak to clients |
+| **Webhook security** | Stripe signature verification; invalid signatures return 400 |
+| **Actuator** | `/health` is public; `/metrics`, `/info` require `ADMIN` role |
+| **Audit trail** | Admin actions logged with `ADMIN_AUDIT:` prefix (user email, action, target) |
+
+---
+
+## Tech Stack
+
+| Component | Version | Purpose |
+|-----------|---------|---------|
+| Java | 21 (LTS) | Language runtime |
+| Spring Boot | 4.0.2 | Application framework |
+| Spring Security | 7.x | Authentication & authorization |
+| Spring Data JPA | 4.x | Data access with JPQL & pessimistic locking |
+| PostgreSQL | 15+ | Primary database (ACID, row-level locking, `TEXT[]`) |
+| HikariCP | 6.x | Connection pooling (configurable size & timeouts) |
+| JJWT | 0.13.0 | Stateless JWT token management |
+| Stripe SDK | 31.3.0 | PCI-compliant payments, webhooks, refunds |
+| ModelMapper | 3.2.6 | Entity-to-DTO mapping |
+| SpringDoc OpenAPI | 2.8.6 | Swagger UI & API documentation |
+| Lombok | latest | Boilerplate reduction |
+| java-dotenv | 5.2.2 | 12-factor environment configuration |
+| Gradle | 9.3 | Build & dependency management |
+
+---
+
+## Getting Started
 
 ### Prerequisites
-- **Java 21** (JDK)
-- **PostgreSQL 15+**
-- **Stripe Account** (test keys)
-- **Gradle 8+** (or use included `gradlew`)
 
-### Local Setup
+- **Java 21** or later
+- **PostgreSQL 15+** running locally or remotely
+- **Stripe account** with test API keys ([dashboard.stripe.com](https://dashboard.stripe.com))
+
+### Quick Start
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/your-username/BookingSystem.git
-cd BookingSystem
+# Clone the repository
+git clone <repo-url> && cd BookingSystem
 
-# 2. Create PostgreSQL database
-psql -U postgres -c "CREATE DATABASE HotelDB;"
-
-# 3. Configure environment variables
+# Configure environment
 cp .env.example .env
 # Edit .env with your database credentials, JWT secret, and Stripe keys
 
-# 4. Build and run
+# For development, set JPA_DDL_AUTO=update in .env to auto-create tables
+
+# Build and run
 ./gradlew bootRun
 
-# 5. Verify
+# Verify
 curl http://localhost:8080/api/v1/actuator/health
 ```
 
-### Production Setup
-```bash
-# Build JAR
-./gradlew clean build -x test
+**Swagger UI:** [http://localhost:8080/api/v1/swagger-ui.html](http://localhost:8080/api/v1/swagger-ui.html)
 
-# Run with production profile
-java -jar build/libs/BookingSystem-0.0.1-SNAPSHOT.jar
+---
+
+## Configuration
+
+### Required Environment Variables
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `SPRING_APPLICATION_NAME` | Application name | `BookingSystem` |
+| `DB_URL` | PostgreSQL JDBC URL | `jdbc:postgresql://localhost:5432/HotelDB` |
+| `DB_USERNAME` | Database username | `postgres` |
+| `DB_PASSWORD` | Database password | `your_password` |
+| `JWT_SECRET` | Signing key (min 32 bytes) | Random 64+ char string |
+| `JWT_EXPIRATION` | Access token TTL (ms) | `300000` (5 min) |
+| `JWT_REFRESH_TOKEN` | Refresh token TTL (ms) | `604800000` (7 days) |
+| `STRIPE_KEY` | Stripe secret key | `sk_test_...` |
+| `WEBHOOK_SECRET` | Stripe webhook signing secret | `whsec_...` |
+
+### Optional Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `JPA_DDL_AUTO` | `validate` | Hibernate schema mode (`update` for dev) |
+| `HIKARI_MAX_POOL_SIZE` | `10` | Maximum database connections |
+| `HIKARI_MIN_IDLE` | `5` | Minimum idle connections in pool |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:3000,http://localhost:5173` | Comma-separated allowed origins |
+| `FRONTEND_URL` | `http://localhost:8080` | Stripe payment redirect base URL |
+| `BOOKING_TTL_MINUTES` | `10` | Reservation expiry time in minutes |
+| `STRIPE_CURRENCY` | `inr` | ISO 4217 currency code for payments |
+| `STRIPE_MIN_AMOUNT` | `5000` | Minimum charge in smallest currency unit |
+| `LOG_LEVEL` | `INFO` | Application log level (`DEBUG`, `INFO`, `WARN`) |
+
+---
+
+## Production Deployment
+
+| Area | Recommendation |
+|------|---------------|
+| **Schema management** | Set `JPA_DDL_AUTO=validate`. Use [Flyway](https://flywaydb.org/) or [Liquibase](https://www.liquibase.com/) for migrations. |
+| **Connection pool** | Tune `HIKARI_MAX_POOL_SIZE` based on `max_connections / instance_count`. |
+| **HTTPS** | Terminate TLS at the reverse proxy (nginx, AWS ALB). Refresh cookies are marked `Secure`. |
+| **CORS** | Set `CORS_ALLOWED_ORIGINS` to your production frontend domain(s). |
+| **Monitoring** | Integrate `/actuator/metrics` with Prometheus + Grafana. |
+| **Stripe webhooks** | Register your public URL in Stripe dashboard; update `WEBHOOK_SECRET`. |
+| **Logging** | Route structured logs to a centralized system (ELK, CloudWatch, Datadog). |
+| **Secrets** | Use a secrets manager (Vault, AWS Secrets Manager) instead of `.env` files. |
+
+---
+
+## Tradeoffs & Limitations
+
+### Pessimistic vs Optimistic Locking
+
+Pessimistic locks hold database row locks for the duration of the transaction. Under extreme concurrency (thousands of simultaneous bookings for the same room), this causes lock contention and potential timeouts. For hotel-level concurrency (not airline-level), pessimistic locking provides the strongest correctness guarantee with acceptable throughput.
+
+### Hourly Price Recalculation
+
+Dynamic prices update on an hourly schedule, not in real-time. Bookings between recalculations use the latest price snapshot. This keeps the booking path fast and avoids recalculating prices under lock contention.
+
+### Single-Region Deployment
+
+The pessimistic locking strategy requires a single PostgreSQL writer, limiting geographic scaling. Read replicas can serve search and read-heavy queries.
+
+### Known Limitations
+
+| Feature | Status |
+|---------|--------|
+| Email notifications | Not implemented |
+| Redis caching (search, hotel details) | Not implemented |
+| Image upload (S3 integration) | Not implemented |
+| Holiday calendar for pricing | Date-based heuristic only |
+| Rate limiting (auth, search) | Recommended via API gateway or Resilience4j |
+| JWT refresh token server-side revocation | Cookie cleared on logout, token valid until expiry |
+
+---
+
+## Scaling Strategy
+
+```
+Phase 1 (Vertical)          Phase 2 (Horizontal)           Phase 3 (Distributed)
+─────────────────           ────────────────────           ──────────────────────
+HikariCP tuning             PostgreSQL read replicas       Message queue (Kafka/RabbitMQ)
+Query optimization          Redis caching layer            Event-driven payment flow
+Index tuning                API gateway + rate limiting    Distributed tracing (Zipkin)
+                            Multiple app instances         Multi-region read replicas
 ```
 
 ---
 
-## 🌍 Environment Variables
+<div align="center">
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `SPRING_APPLICATION_NAME` | Application name for Spring | `BookingSystem` |
-| `DB_URL` | PostgreSQL JDBC connection URL | `jdbc:postgresql://localhost:5432/HotelDB` |
-| `DB_USERNAME` | Database username | `postgres` |
-| `DB_PASSWORD` | Database password | `your_password` |
-| `JWT_SECRET` | HMAC-SHA signing key (min 64 chars) | `<long-random-string>` |
-| `JWT_EXPIRATION` | Access token TTL in milliseconds | `300000` (5 min) |
-| `JWT_REFRESH_TOKEN` | Refresh token TTL in milliseconds | `604800000` (7 days) |
-| `STRIPE_KEY` | Stripe secret API key | `sk_test_...` |
-| `WEBHOOK_SECRET` | Stripe webhook endpoint secret | `whsec_...` |
+**Built with Spring Boot 4 | Java 21 | PostgreSQL | Stripe**
 
-> ⚠️ **Never commit `.env` to version control.** It is already in `.gitignore`.
-
----
-
-## 📘 Developer Guide
-
-### Adding a New Feature
-1. Create entity in `entity/` package with JPA annotations
-2. Create DTO(s) in `dto/` package for request/response
-3. Create repository interface extending `JpaRepository` in `repository/`
-4. Create service interface in `service/` and implementation in `service/impl/`
-5. Create controller in `controller/` with appropriate `@RequestMapping`
-6. Add security rules in `SecurityConfig` if needed
-7. Create custom exception(s) and add handler in `GlobalExceptionHandler`
-
-### Adding a New Pricing Strategy
-1. Create class implementing `PricingStrategy` in `strategy/impl/`
-2. Accept `PricingStrategy` in constructor (decorator pattern)
-3. Call `pricingStrategy.calculatePrice(inventory)` then apply your logic
-4. Chain it in `PricingService.calculateDynamicPricing()`
-
-### Debugging Tips
-- Enable SQL logging: add `spring.jpa.show-sql: true` in `application.yaml`
-- Check Actuator health: `GET /api/v1/actuator/health`
-- Validate JWT tokens at [jwt.io](https://jwt.io)
-- Use Stripe CLI for local webhook testing: `stripe listen --forward-to localhost:8080/api/v1/webhooks/payment`
-
----
-
-## 📈 Business & Scaling Vision
-
-### Growth Path
-| Phase | Description |
-|-------|-------------|
-| **Phase 1** (Current) | Single-hotel-manager platform with core booking + payments |
-| **Phase 2** | Multi-tenant marketplace with manager dashboards and analytics |
-| **Phase 3** | Mobile apps (React Native), push notifications, loyalty programs |
-| **Phase 4** | AI-powered pricing recommendations, demand forecasting, review system |
-
-### Monetization
-- **Commission Model**: Platform takes 10-15% per confirmed booking
-- **Premium Listings**: Featured hotel placement in search results
-- **SaaS Model**: Subscription-based hotel management dashboard
-- **Dynamic Pricing Add-on**: Advanced pricing analytics as paid tier
-
-### Enterprise Readiness
-- ✅ Role-based access control
-- ✅ API versioning (`/api/v1`)
-- ✅ Stateless architecture (horizontal scaling ready)
-- ✅ Payment processing with refund support
-- 🔄 Needs: Audit logging, multi-region DB, rate limiting, API gateway
-
----
-
-
-**Built with ❤️ using Spring Boot 4 · Java 21 · PostgreSQL · Stripe**
-
-⭐ Star this repository if you find it useful!
-
+</div>

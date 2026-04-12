@@ -6,20 +6,35 @@ spring:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${HIKARI_MAX_POOL_SIZE:10}
+      minimum-idle: ${HIKARI_MIN_IDLE:5}
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
 
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: ${JPA_DDL_AUTO:validate}
+    open-in-view: false
 
   app:
     secret-key: ${JWT_SECRET}
     expiration: ${JWT_EXPIRATION}
     refreshtoken: ${JWT_REFRESH_TOKEN}
 
+app:
+  booking:
+    reservation-ttl-minutes: ${BOOKING_TTL_MINUTES:10}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
+  stripe:
+    currency: ${STRIPE_CURRENCY:inr}
+    minimum-amount: ${STRIPE_MIN_AMOUNT:5000}
+
 server:
   servlet:
     context-path: /api/v1
-
 
   stripe:
     secret:
@@ -28,15 +43,17 @@ server:
     webhook:
       secret: ${WEBHOOK_SECRET}
 
-
-
-
   frontend:
-    url: http://localhost:8080
+    url: ${FRONTEND_URL:http://localhost:8080}
 
 
-
-
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: method
+  api-docs:
+    path: /api-docs
 
 management:
   endpoints:
@@ -45,4 +62,11 @@ management:
         include: health,info,metrics
   endpoint:
     health:
-      show-details: always
+      show-details: when-authorized
+
+logging:
+  level:
+    root: INFO
+    com.bookingsystem: ${LOG_LEVEL:INFO}
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN

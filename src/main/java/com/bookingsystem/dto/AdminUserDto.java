@@ -1,30 +1,24 @@
 package com.bookingsystem.dto;
 
 import com.bookingsystem.entity.enums.Gender;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Past;
+import com.bookingsystem.entity.enums.Role;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.util.Set;
 
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class GuestDto {
+public class AdminUserDto {
     private Long id;
-
-    @NotBlank(message = "Guest name is required")
+    private String email;
     private String name;
-
-    @NotNull(message = "Gender is required")
     private Gender gender;
-
-    @NotNull(message = "Date of birth is required")
-    @Past(message = "Date of birth must be in the past")
     private LocalDate dateOfBirth;
+    private Set<Role> roles;
 }

@@ -3,7 +3,9 @@ package com.bookingsystem.security.service.impl;
 import com.bookingsystem.dto.*;
 import com.bookingsystem.entity.User;
 import com.bookingsystem.entity.enums.Role;
+import com.bookingsystem.exception.APIException;
 import com.bookingsystem.exception.UserAlreadyExistsException;
+import com.bookingsystem.exception.UserNotFoundException;
 import com.bookingsystem.repository.UserRepository;
 import com.bookingsystem.security.jwt.JwtService;
 import com.bookingsystem.security.service.AuthService;
@@ -56,11 +58,11 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public String refreshToken(String refreshToken) {
         if (!jwtService.validateRefreshToken(refreshToken)) {
-            throw new RuntimeException("Invalid or expired refresh token");
+            throw new APIException("Invalid or expired refresh token");
         }
         Long userId = jwtService.getUserIdFromToken(refreshToken);
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException("id", userId));
         return jwtService.generateAccessToken(user);
     }
 }

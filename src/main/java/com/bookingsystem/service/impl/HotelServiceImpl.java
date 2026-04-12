@@ -8,23 +8,20 @@ import com.bookingsystem.exception.APIException;
 import com.bookingsystem.exception.ResourceNotFoundException;
 import com.bookingsystem.exception.UnAuthorisedException;
 import com.bookingsystem.repository.HotelRepository;
-
 import com.bookingsystem.repository.RoomRepository;
 import com.bookingsystem.service.HotelService;
 import com.bookingsystem.service.InventoryService;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Objects;
-import java.util.stream.Collectors;
+
+import static com.bookingsystem.security.utils.AuthUtils.getCurrentUser;
 
 @Service
 @RequiredArgsConstructor
-@Transactional
 public class HotelServiceImpl implements HotelService {
     private final HotelRepository hotelRepository;
     private final InventoryService inventoryService;
@@ -32,43 +29,48 @@ public class HotelServiceImpl implements HotelService {
     private final ModelMapper modelMapper;
 
     @Override
+    @Transactional
     public HotelResponse createNewHotel(HotelRequest hotelRequest) {
         if (hotelRepository.existsByNameAndCity(hotelRequest.getName(), hotelRequest.getCity())) {
-            throw new APIException("Hotel already exists!");
+            throw new APIException("Hotel already exists with this name in this city");
         }
         Hotel hotel = modelMapper.map(hotelRequest, Hotel.class);
         hotel.setActive(false);
-        User user = (User) Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()).getPrincipal();
-        hotel.setOwner(user);
+        hotel.setOwner(getCurrentUser());
         hotelRepository.save(hotel);
         return modelMapper.map(hotel, HotelResponse.class);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public HotelResponse getHotelById(Long id) {
-        Hotel hotel = hotelRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", id));
-        User user = (User) Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()).getPrincipal();
+        Hotel hotel = hotelRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", id));
+        User user = getCurrentUser();
         if (!user.equals(hotel.getOwner())) {
-            throw new UnAuthorisedException("User is unauthorized to view hotel");
+            throw new UnAuthorisedException("User is unauthorized to view this hotel");
         }
         return modelMapper.map(hotel, HotelResponse.class);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<HotelResponse> findAllHotels() {
-        List<Hotel> hotels = hotelRepository.findAll();
+        User user = getCurrentUser();
+        List<Hotel> hotels = hotelRepository.findByOwner(user);
         return hotels.stream()
                 .map(hotel -> modelMapper.map(hotel, HotelResponse.class))
                 .toList();
     }
 
     @Override
+    @Transactional
     public HotelResponse updateHotelById(Long id, HotelRequest hotelRequest) {
         Hotel existingHotel = hotelRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", id));
-        User user = (User) Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()).getPrincipal();
+        User user = getCurrentUser();
         if (!user.equals(existingHotel.getOwner())) {
-            throw new UnAuthorisedException("User is unauthorized to view hotel");
+            throw new UnAuthorisedException("User is unauthorized to update this hotel");
         }
         existingHotel.setName(hotelRequest.getName());
         existingHotel.setCity(hotelRequest.getCity());
@@ -83,12 +85,13 @@ public class HotelServiceImpl implements HotelService {
     }
 
     @Override
+    @Transactional
     public void deleteHotelById(Long id) {
         Hotel hotel = hotelRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", id));
-        User user = (User) Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()).getPrincipal();
+        User user = getCurrentUser();
         if (!user.equals(hotel.getOwner())) {
-            throw new UnAuthorisedException("User is unauthorized to view hotel");
+            throw new UnAuthorisedException("User is unauthorized to delete this hotel");
         }
         for (Room room : hotel.getRooms()) {
             inventoryService.deleteAllInventories(room);
@@ -98,12 +101,13 @@ public class HotelServiceImpl implements HotelService {
     }
 
     @Override
+    @Transactional
     public HotelResponse updateHotelStatus(Long id, Boolean status) {
         Hotel hotel = hotelRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", id));
-        User user = (User) Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()).getPrincipal();
+        User user = getCurrentUser();
         if (!user.equals(hotel.getOwner())) {
-            throw new UnAuthorisedException("User is unauthorized to view hotel");
+            throw new UnAuthorisedException("User is unauthorized to update this hotel's status");
         }
         hotel.setActive(status);
         if (Boolean.TRUE.equals(status)) {
@@ -120,12 +124,13 @@ public class HotelServiceImpl implements HotelService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public HotelInfoDto getHotelInfoById(Long hotelId) {
         Hotel hotel = hotelRepository.findById(hotelId)
                 .orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", hotelId));
-        List<RoomResponse> rooms = hotel.getRooms().stream().map((element) ->
-                modelMapper.map(element, RoomResponse.class)).toList();
+        List<RoomResponse> rooms = hotel.getRooms().stream()
+                .map(element -> modelMapper.map(element, RoomResponse.class))
+                .toList();
         return new HotelInfoDto(modelMapper.map(hotel, HotelSearchResponse.class), rooms);
     }
-
 }
