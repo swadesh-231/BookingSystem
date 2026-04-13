@@ -14,9 +14,11 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
 public interface InventoryRepository extends JpaRepository<Inventory, Long> {
     void deleteByRoom(Room room);
+    void deleteByHotel(Hotel hotel);
     boolean existsByRoomAndDate(Room room, LocalDate date);
     @Query("""
             SELECT DISTINCT i.hotel
@@ -61,7 +63,7 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
                   AND i.closed = false
             """)
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    void findAndLockReservedInventory(@Param("roomId") Long roomId,
+    List<Inventory> findAndLockReservedInventory(@Param("roomId") Long roomId,
                                                  @Param("startDate") LocalDate startDate,
                                                  @Param("endDate") LocalDate endDate,
                                                  @Param("numberOfRooms") int numberOfRooms);
@@ -74,10 +76,10 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
                   AND (i.totalCount - i.bookedCount - i.reservedCount) >= :numberOfRooms
                   AND i.closed = false
             """)
-    void initBooking(@Param("roomId") Long roomId,
-                     @Param("startDate") LocalDate startDate,
-                     @Param("endDate") LocalDate endDate,
-                     @Param("numberOfRooms") int numberOfRooms);
+    int initBooking(@Param("roomId") Long roomId,
+                    @Param("startDate") LocalDate startDate,
+                    @Param("endDate") LocalDate endDate,
+                    @Param("numberOfRooms") int numberOfRooms);
     @Modifying
     @Query("""
                 UPDATE Inventory i
@@ -89,10 +91,10 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
                   AND i.reservedCount >= :numberOfRooms
                   AND i.closed = false
             """)
-    void confirmBooking(@Param("roomId") Long roomId,
-                        @Param("startDate") LocalDate startDate,
-                        @Param("endDate") LocalDate endDate,
-                        @Param("numberOfRooms") int numberOfRooms);
+    int confirmBooking(@Param("roomId") Long roomId,
+                       @Param("startDate") LocalDate startDate,
+                       @Param("endDate") LocalDate endDate,
+                       @Param("numberOfRooms") int numberOfRooms);
     @Modifying
     @Query("""
                 UPDATE Inventory i
@@ -121,7 +123,14 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
                                   @Param("endDate") LocalDate endDate,
                                   @Param("numberOfRooms") int numberOfRooms);
 
+    @Query("SELECT i.date FROM Inventory i WHERE i.room = :room AND i.date BETWEEN :startDate AND :endDate")
+    Set<LocalDate> findExistingDatesByRoomAndDateRange(@Param("room") Room room,
+                                                       @Param("startDate") LocalDate startDate,
+                                                       @Param("endDate") LocalDate endDate);
+
     List<Inventory> findByHotelAndDateBetween(Hotel hotel, LocalDate startDate, LocalDate endDate);
 
     List<Inventory> findByRoomOrderByDate(Room room);
+
+    List<Inventory> findByRoomAndDateBetweenOrderByDate(Room room, LocalDate startDate, LocalDate endDate);
 }

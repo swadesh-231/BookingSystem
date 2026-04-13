@@ -13,7 +13,10 @@ import java.util.List;
 @Getter
 @Setter
 @Builder
-@Table(name = "hotels")
+@Table(name = "hotels", indexes = {
+        @Index(name = "idx_hotel_city_active", columnList = "city, active"),
+        @Index(name = "idx_hotel_owner", columnList = "owner_id")
+})
 public class Hotel {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -16,12 +16,21 @@ public interface HotelPriceRepository extends JpaRepository<HotelPrice, Long> {
     Optional<HotelPrice> findByHotelAndDate(Hotel hotel, LocalDate date);
 
     @Query("""
-             SELECT new com.bookingsystem.dto.HotelPriceDto(i.hotel, AVG(i.price))
-             FROM HotelPrice i
-             WHERE i.hotel.city = :city
-                 AND i.date BETWEEN :startDate AND :endDate
-                 AND i.hotel.active = true
-            GROUP BY i.hotel
+             SELECT new com.bookingsystem.dto.HotelPriceDto(hp.hotel, AVG(hp.price))
+             FROM HotelPrice hp
+             WHERE hp.hotel.city = :city
+                 AND hp.date BETWEEN :startDate AND :endDate
+                 AND hp.hotel.active = true
+                 AND hp.hotel IN (
+                     SELECT i.hotel FROM Inventory i
+                     WHERE i.city = :city
+                         AND i.date BETWEEN :startDate AND :endDate
+                         AND i.closed = false
+                         AND (i.totalCount - i.bookedCount - i.reservedCount) >= :roomsCount
+                     GROUP BY i.hotel, i.room
+                     HAVING COUNT(DISTINCT i.date) >= :dateCount
+                 )
+            GROUP BY hp.hotel
             """)
     Page<HotelPriceDto> findHotelsWithAvailableInventory(
             @Param("city") String city,

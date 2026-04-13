@@ -13,10 +13,17 @@ import com.bookingsystem.service.HotelService;
 import com.bookingsystem.service.InventoryService;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+
+import static com.bookingsystem.config.CacheConfig.HOTEL_INFO;
+import static com.bookingsystem.config.CacheConfig.HOTEL_SEARCH;
 
 import static com.bookingsystem.security.utils.AuthUtils.getCurrentUser;
 
@@ -25,6 +32,7 @@ import static com.bookingsystem.security.utils.AuthUtils.getCurrentUser;
 public class HotelServiceImpl implements HotelService {
     private final HotelRepository hotelRepository;
     private final InventoryService inventoryService;
+    private final com.bookingsystem.repository.InventoryRepository inventoryRepository;
     private final RoomRepository roomRepository;
     private final ModelMapper modelMapper;
 
@@ -64,7 +72,16 @@ public class HotelServiceImpl implements HotelService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Page<HotelResponse> findAllHotels(Pageable pageable) {
+        User user = getCurrentUser();
+        return hotelRepository.findByOwner(user, pageable)
+                .map(hotel -> modelMapper.map(hotel, HotelResponse.class));
+    }
+
+    @Override
     @Transactional
+    @CacheEvict(value = {HOTEL_INFO, HOTEL_SEARCH}, allEntries = true)
     public HotelResponse updateHotelById(Long id, HotelRequest hotelRequest) {
         Hotel existingHotel = hotelRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", id));
@@ -86,6 +103,7 @@ public class HotelServiceImpl implements HotelService {
 
     @Override
     @Transactional
+    @CacheEvict(value = {HOTEL_INFO, HOTEL_SEARCH}, allEntries = true)
     public void deleteHotelById(Long id) {
         Hotel hotel = hotelRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", id));
@@ -93,15 +111,14 @@ public class HotelServiceImpl implements HotelService {
         if (!user.equals(hotel.getOwner())) {
             throw new UnAuthorisedException("User is unauthorized to delete this hotel");
         }
-        for (Room room : hotel.getRooms()) {
-            inventoryService.deleteAllInventories(room);
-            roomRepository.deleteById(room.getId());
-        }
+        inventoryRepository.deleteByHotel(hotel);
+        roomRepository.deleteByHotel(hotel);
         hotelRepository.deleteById(id);
     }
 
     @Override
     @Transactional
+    @CacheEvict(value = {HOTEL_INFO, HOTEL_SEARCH}, allEntries = true)
     public HotelResponse updateHotelStatus(Long id, Boolean status) {
         Hotel hotel = hotelRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", id));
@@ -125,8 +142,9 @@ public class HotelServiceImpl implements HotelService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = HOTEL_INFO, key = "#hotelId")
     public HotelInfoDto getHotelInfoById(Long hotelId) {
-        Hotel hotel = hotelRepository.findById(hotelId)
+        Hotel hotel = hotelRepository.findByIdWithRooms(hotelId)
                 .orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", hotelId));
         List<RoomResponse> rooms = hotel.getRooms().stream()
                 .map(element -> modelMapper.map(element, RoomResponse.class))

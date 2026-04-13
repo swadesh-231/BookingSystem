@@ -33,6 +33,10 @@ public class RoomServiceImpl implements RoomService {
     public RoomResponse createNewRoom(Long hotelId, RoomRequest roomRequest) {
         Hotel hotel = hotelRepository.findById(hotelId)
                 .orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", hotelId));
+        User user = getCurrentUser();
+        if (!user.equals(hotel.getOwner())) {
+            throw new UnAuthorisedException("You are not the owner of this hotel");
+        }
         Room room = modelMapper.map(roomRequest, Room.class);
         room.setHotel(hotel);
         roomRepository.save(room);
@@ -46,7 +50,10 @@ public class RoomServiceImpl implements RoomService {
     public List<RoomResponse> getAllRoomsInHotel(Long hotelId) {
         Hotel hotel = hotelRepository.findById(hotelId)
                 .orElseThrow(() -> new ResourceNotFoundException("Hotel", "id", hotelId));
-        //bidirectional mapping in hotel entity class
+        User user = getCurrentUser();
+        if (!user.equals(hotel.getOwner())) {
+            throw new UnAuthorisedException("You are not the owner of this hotel");
+        }
         return hotel.getRooms().stream()
                 .map(room -> modelMapper.map(room, RoomResponse.class))
                 .toList();
@@ -56,6 +63,10 @@ public class RoomServiceImpl implements RoomService {
     public RoomResponse getRoomById(Long roomId) {
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new ResourceNotFoundException("Room", "id", roomId));
+        User user = getCurrentUser();
+        if (!user.equals(room.getHotel().getOwner())) {
+            throw new UnAuthorisedException("You are not the owner of this room's hotel");
+        }
         return modelMapper.map(room, RoomResponse.class);
     }
 
@@ -63,6 +74,10 @@ public class RoomServiceImpl implements RoomService {
     public void deleteRoomById(Long roomId) {
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new ResourceNotFoundException("Room", "id", roomId));
+        User user = getCurrentUser();
+        if (!user.equals(room.getHotel().getOwner())) {
+            throw new UnAuthorisedException("You are not the owner of this room's hotel");
+        }
         inventoryService.deleteAllInventories(room);
         roomRepository.delete(room);
     }

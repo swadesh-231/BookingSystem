@@ -17,6 +17,12 @@ spring:
     hibernate:
       ddl-auto: ${JPA_DDL_AUTO:validate}
     open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
 
   app:
     secret-key: ${JWT_SECRET}
@@ -59,10 +65,35 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: when-authorized
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+resilience4j.ratelimiter:
+  configs:
+    default:
+      registerHealthIndicator: false
+      limitForPeriod: 100
+      limitRefreshPeriod: 1m
+      timeoutDuration: 0
+      eventConsumerBufferSize: 100
+  instances:
+    loginLimit:
+      limitForPeriod: 5
+      limitRefreshPeriod: 1m
+      timeoutDuration: 0
+    bookingInitLimit:
+      limitForPeriod: 10
+      limitRefreshPeriod: 1m
+      timeoutDuration: 0
+    searchLimit:
+      limitForPeriod: 30
+      limitRefreshPeriod: 1m
+      timeoutDuration: 0
 
 logging:
   level:

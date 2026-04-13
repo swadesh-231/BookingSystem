@@ -20,6 +20,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -84,8 +86,12 @@ public class BookingServiceImpl implements BookingService {
             throw new RoomNotAvailableException("Requested room is not available for the full date range");
         }
 
-        inventoryRepository.initBooking(room.getId(), bookingRequest.getCheckInDate(),
+        int updatedRows = inventoryRepository.initBooking(room.getId(), bookingRequest.getCheckInDate(),
                 bookingRequest.getCheckOutDate().minusDays(1), bookingRequest.getRoomsCount());
+
+        if (updatedRows != daysCount) {
+            throw new RoomNotAvailableException("Failed to reserve inventory for the full date range");
+        }
 
         BigDecimal priceForOneRoom = pricingService.calculateTotalPrice(inventoryLists);
         BigDecimal totalPrice = priceForOneRoom.multiply(BigDecimal.valueOf(bookingRequest.getRoomsCount()));
@@ -191,14 +197,35 @@ public class BookingServiceImpl implements BookingService {
             return;
         }
 
+        // Skip if cancelled (e.g., TTL expired while payment was processing)
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            log.warn("Webhook received for cancelled booking: {}", booking.getId());
+            return;
+        }
+
+        long daysCount = ChronoUnit.DAYS.between(booking.getCheckInDate(), booking.getCheckOutDate());
+
+        List<Inventory> lockedInventory = inventoryRepository.findAndLockReservedInventory(
+                booking.getRoom().getId(), booking.getCheckInDate(),
+                booking.getCheckOutDate().minusDays(1), booking.getRoomsCount());
+
+        if (lockedInventory.size() != daysCount) {
+            log.error("Inventory lock mismatch for booking {}: expected {} days, locked {}",
+                    booking.getId(), daysCount, lockedInventory.size());
+            throw new APIException("Inventory confirmation failed for booking " + booking.getId());
+        }
+
+        int confirmedRows = inventoryRepository.confirmBooking(booking.getRoom().getId(), booking.getCheckInDate(),
+                booking.getCheckOutDate().minusDays(1), booking.getRoomsCount());
+
+        if (confirmedRows != daysCount) {
+            log.error("Inventory confirm mismatch for booking {}: expected {} rows, confirmed {}",
+                    booking.getId(), daysCount, confirmedRows);
+            throw new APIException("Inventory confirmation failed for booking " + booking.getId());
+        }
+
         booking.setStatus(BookingStatus.CONFIRMED);
         bookingRepository.save(booking);
-
-        inventoryRepository.findAndLockReservedInventory(booking.getRoom().getId(), booking.getCheckInDate(),
-                booking.getCheckOutDate().minusDays(1), booking.getRoomsCount());
-
-        inventoryRepository.confirmBooking(booking.getRoom().getId(), booking.getCheckInDate(),
-                booking.getCheckOutDate().minusDays(1), booking.getRoomsCount());
 
         log.info("Booking {} confirmed via webhook", booking.getId());
     }
@@ -273,6 +300,18 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional(readOnly = true)
+    public Page<BookingResponse> getAllBookingsByHotelId(Long hotelId, Pageable pageable) {
+        Hotel hotel = hotelRepository.findById(hotelId).orElseThrow(() ->
+                new ResourceNotFoundException("Hotel", "id", hotelId));
+        User user = getCurrentUser();
+        if (!user.equals(hotel.getOwner()))
+            throw new UnAuthorisedException("You don't have permission to view bookings for this hotel");
+        return bookingRepository.findByHotel(hotel, pageable)
+                .map(element -> modelMapper.map(element, BookingResponse.class));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public HotelReport getHotelReport(Long hotelId, LocalDate startDate, LocalDate endDate) {
         Hotel hotel = hotelRepository.findById(hotelId).orElseThrow(
                 () -> new ResourceNotFoundException("Hotel", "id", hotelId));
@@ -308,17 +347,27 @@ public class BookingServiceImpl implements BookingService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Page<BookingResponse> getMyBookings(Pageable pageable) {
+        User user = getCurrentUser();
+        return bookingRepository.findByUserOrderByCreatedAtDesc(user, pageable)
+                .map(element -> modelMapper.map(element, BookingResponse.class));
+    }
+
     public boolean hasBookingExpired(Booking booking) {
         return booking.getCreatedAt().plusMinutes(reservationTtlMinutes).isBefore(LocalDateTime.now());
     }
 
     private void releaseExpiredBooking(Booking booking) {
-        if (booking.getStatus() == BookingStatus.RESERVED || booking.getStatus() == BookingStatus.GUEST_ADDED) {
+        if (booking.getStatus() == BookingStatus.RESERVED
+                || booking.getStatus() == BookingStatus.GUEST_ADDED
+                || booking.getStatus() == BookingStatus.PAYMENT_PENDING) {
             booking.setStatus(BookingStatus.CANCELLED);
             bookingRepository.save(booking);
             inventoryRepository.releaseReservedInventory(booking.getRoom().getId(), booking.getCheckInDate(),
                     booking.getCheckOutDate().minusDays(1), booking.getRoomsCount());
-            log.info("Released expired booking {} inventory", booking.getId());
+            log.info("Released expired booking {} inventory (was in {} state)", booking.getId(), booking.getStatus());
         }
     }
 }

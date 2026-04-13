@@ -7,6 +7,7 @@ import com.stripe.net.Webhook;
 import io.swagger.v3.oas.annotations.Hidden;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 @Hidden
 public class WebhookController {
     private final BookingService bookingService;
+    private final MeterRegistry meterRegistry;
 
     @Value("${server.stripe.webhook.secret}")
     private String endpointSecret;
@@ -34,6 +36,7 @@ public class WebhookController {
         }
 
         if ("checkout.session.completed".equals(event.getType())) {
+            meterRegistry.counter("stripe.webhook.received", "type", event.getType()).increment();
             bookingService.capturePayment(event);
         } else {
             log.info("Unhandled Stripe event type: {}", event.getType());

@@ -10,11 +10,12 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
-import java.util.List;
 
 @RestController
 @RequestMapping("/admin/hotel")
@@ -31,10 +32,12 @@ public class HotelController {
         return ResponseEntity.ok(hotel);
     }
 
-    @Operation(summary = "List own hotels", description = "Returns all hotels owned by the authenticated manager")
+    @Operation(summary = "List own hotels", description = "Returns paginated hotels owned by the authenticated manager")
     @GetMapping
-    public ResponseEntity<List<HotelResponse>> getAllHotels() {
-        return ResponseEntity.ok(hotelService.findAllHotels());
+    public ResponseEntity<Page<HotelResponse>> getAllHotels(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(hotelService.findAllHotels(PageRequest.of(page, Math.min(size, 100))));
     }
 
     @Operation(summary = "Get hotel by ID", description = "Returns hotel details. Must be the owner.")
@@ -65,10 +68,12 @@ public class HotelController {
         return ResponseEntity.noContent().build();
     }
 
-    @Operation(summary = "List hotel bookings", description = "Returns all bookings for a hotel. Must be the owner.")
+    @Operation(summary = "List hotel bookings", description = "Returns paginated bookings for a hotel. Must be the owner.")
     @GetMapping("/{hotelId}/bookings")
-    public ResponseEntity<List<BookingResponse>> getBookingsByHotelId(@PathVariable Long hotelId) {
-        return ResponseEntity.ok(bookingService.getAllBookingsByHotelId(hotelId));
+    public ResponseEntity<Page<BookingResponse>> getBookingsByHotelId(@PathVariable Long hotelId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(bookingService.getAllBookingsByHotelId(hotelId, PageRequest.of(page, Math.min(size, 100))));
     }
 
     @Operation(summary = "Hotel revenue report", description = "Returns booking count, total revenue, and average revenue for confirmed bookings in the date range. Defaults to last month.")

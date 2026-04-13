@@ -15,6 +15,7 @@ import com.bookingsystem.service.InventoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -26,7 +27,10 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
+
+import static com.bookingsystem.config.CacheConfig.HOTEL_SEARCH;
 
 import static com.bookingsystem.security.utils.AuthUtils.getCurrentUser;
 
@@ -45,9 +49,12 @@ public class InventoryServiceImpl implements InventoryService {
         LocalDate today = LocalDate.now();
         LocalDate endDate = today.plusYears(1);
 
+        // Single query instead of 365+ individual existsByRoomAndDate() calls
+        Set<LocalDate> existingDates = inventoryRepository.findExistingDatesByRoomAndDateRange(room, today, endDate);
+
         List<Inventory> batch = new ArrayList<>();
         for (LocalDate date = today; !date.isAfter(endDate); date = date.plusDays(1)) {
-            if (!inventoryRepository.existsByRoomAndDate(room, date)) {
+            if (!existingDates.contains(date)) {
                 Inventory inventory = Inventory.builder()
                         .hotel(room.getHotel())
                         .room(room)
@@ -98,6 +105,7 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = HOTEL_SEARCH, key = "#hotelSearchRequest.city + '-' + #hotelSearchRequest.startDate + '-' + #hotelSearchRequest.endDate + '-' + #hotelSearchRequest.roomsCount + '-' + #hotelSearchRequest.page + '-' + #hotelSearchRequest.size")
     public Page<HotelPriceResponse> searchHotels(HotelSearchRequest hotelSearchRequest) {
         if (hotelSearchRequest.getStartDate() == null || hotelSearchRequest.getEndDate() == null) {
             throw new APIException("Start date and end date are required for search");
@@ -139,10 +147,8 @@ public class InventoryServiceImpl implements InventoryService {
             throw new APIException("Start date and end date are required");
         }
 
-        List<Inventory> inventories = inventoryRepository.findByRoomOrderByDate(room).stream()
-                .filter(inv -> !inv.getDate().isBefore(inventoryRequest.getStartDate())
-                        && !inv.getDate().isAfter(inventoryRequest.getEndDate()))
-                .collect(Collectors.toList());
+        List<Inventory> inventories = inventoryRepository.findByRoomAndDateBetweenOrderByDate(
+                room, inventoryRequest.getStartDate(), inventoryRequest.getEndDate());
 
         for (Inventory inventory : inventories) {
             if (inventoryRequest.getSurgeFactor() != null) {

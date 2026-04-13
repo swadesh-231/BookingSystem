@@ -20,6 +20,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.Arrays;
 
 @RestController
@@ -28,6 +30,7 @@ import java.util.Arrays;
 @Tag(name = "Authentication", description = "Register, login, logout, and token refresh")
 public class AuthController {
     private final AuthService authService;
+    private final MeterRegistry meterRegistry;
 
     @Value("${spring.app.refreshtoken}")
     private Long refreshTokenExpiry;
@@ -39,10 +42,12 @@ public class AuthController {
     }
 
     @Operation(summary = "Login", description = "Authenticates user and returns access token. Refresh token is set as HttpOnly cookie.")
+    @RateLimiter(name = "loginLimit", fallbackMethod = "loginFallback")
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest loginRequest,
                                                 HttpServletResponse response) {
         LoginResponse loginResponse = authService.login(loginRequest);
+        meterRegistry.counter("auth.login.success", "user", loginRequest.getEmail()).increment();
 
         ResponseCookie cookie = ResponseCookie.from("refreshToken", loginResponse.getRefresh_token())
                 .httpOnly(true)
@@ -86,6 +91,11 @@ public class AuthController {
                 .map(Cookie::getValue)
                 .orElseThrow(() -> new AuthenticationServiceException("Refresh token missing"));
         String accessToken = authService.refreshToken(refreshToken);
+        meterRegistry.counter("auth.token.refresh").increment();
         return ResponseEntity.ok(new LoginResponse(accessToken, null));
+    }
+
+    public ResponseEntity<LoginResponse> loginFallback(Exception e) {
+        throw new com.bookingsystem.exception.APIException("Too many login attempts. Please try again later.");
     }
 }

@@ -22,7 +22,9 @@ import java.util.List;
         @Index(name = "idx_booking_user", columnList = "user_id"),
         @Index(name = "idx_booking_hotel", columnList = "hotel_id"),
         @Index(name = "idx_booking_status", columnList = "status"),
-        @Index(name = "idx_booking_session", columnList = "paymentSessionId")
+        @Index(name = "idx_booking_session", columnList = "paymentSessionId"),
+        @Index(name = "idx_booking_status_created", columnList = "status, createdAt"),
+        @Index(name = "idx_booking_hotel_created", columnList = "hotel_id, createdAt")
 })
 public class Booking {
     @Id

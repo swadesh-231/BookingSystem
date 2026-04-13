@@ -10,22 +10,28 @@ import com.bookingsystem.entity.Room;
 import com.bookingsystem.entity.User;
 import com.bookingsystem.entity.enums.BookingStatus;
 import com.bookingsystem.entity.enums.Role;
+import com.bookingsystem.exception.APIException;
 import com.bookingsystem.exception.ResourceNotFoundException;
 import com.bookingsystem.repository.BookingRepository;
 import com.bookingsystem.repository.HotelRepository;
 import com.bookingsystem.repository.UserRepository;
 import com.bookingsystem.service.AdminService;
+import com.bookingsystem.service.AuditService;
 import com.bookingsystem.service.InventoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Set;
+
+import static com.bookingsystem.config.CacheConfig.PLATFORM_STATS;
 
 import static com.bookingsystem.security.utils.AuthUtils.getCurrentUser;
 
@@ -37,6 +43,7 @@ public class AdminServiceImpl implements AdminService {
     private final HotelRepository hotelRepository;
     private final BookingRepository bookingRepository;
     private final InventoryService inventoryService;
+    private final AuditService auditService;
     private final ModelMapper modelMapper;
 
     @Override
@@ -62,6 +69,8 @@ public class AdminServiceImpl implements AdminService {
         User admin = getCurrentUser();
         log.info("ADMIN_AUDIT: Admin {} updated roles for user {} from {} to {}",
                 admin.getEmail(), user.getEmail(), user.getRoles(), roles);
+        auditService.log("ROLE_UPDATE", "User", userId,
+                "Roles changed from " + user.getRoles() + " to " + roles);
         user.setRoles(roles);
         userRepository.save(user);
         return modelMapper.map(user, AdminUserDto.class);
@@ -73,7 +82,20 @@ public class AdminServiceImpl implements AdminService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
         User admin = getCurrentUser();
+
+        if (admin.getId().equals(userId)) {
+            throw new APIException("Cannot delete your own admin account");
+        }
+
+        // Check for active bookings
+        long activeBookings = bookingRepository.countByUserAndStatusNotIn(user,
+                List.of(BookingStatus.CANCELLED, BookingStatus.CONFIRMED));
+        if (activeBookings > 0) {
+            throw new APIException("Cannot delete user with " + activeBookings + " active booking(s). Cancel them first.");
+        }
+
         log.info("ADMIN_AUDIT: Admin {} deleted user {}", admin.getEmail(), user.getEmail());
+        auditService.log("USER_DELETE", "User", userId, "Deleted user: " + user.getEmail());
         userRepository.delete(user);
     }
 
@@ -92,6 +114,8 @@ public class AdminServiceImpl implements AdminService {
         User admin = getCurrentUser();
         log.info("ADMIN_AUDIT: Admin {} changed hotel '{}' (id={}) active status from {} to {}",
                 admin.getEmail(), hotel.getName(), hotelId, hotel.getActive(), active);
+        auditService.log("HOTEL_STATUS_CHANGE", "Hotel", hotelId,
+                "Status changed from " + hotel.getActive() + " to " + active);
         hotel.setActive(active);
         if (Boolean.TRUE.equals(active)) {
             for (Room room : hotel.getRooms()) {
@@ -115,6 +139,7 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = PLATFORM_STATS, key = "'stats'")
     public PlatformStatsDto getPlatformStats() {
         long totalUsers = userRepository.count();
         long totalHotels = hotelRepository.count();

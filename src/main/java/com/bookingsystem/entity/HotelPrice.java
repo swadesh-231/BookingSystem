@@ -14,6 +14,9 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
+@Table(indexes = {
+        @Index(name = "idx_hotelprice_hotel_date", columnList = "hotel_id, date")
+})
 public class HotelPrice {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
