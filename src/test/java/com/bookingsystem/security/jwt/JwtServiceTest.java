@@ -51,10 +51,7 @@ class JwtServiceTest {
     void getUserIdFromToken_WithExpiredToken_ThrowsExpiredJwtException() {
         // Manually create expired token
         Key key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
-        String expiredToken = Jwts.builder()
-                .setSubject("123")
-                .setIssuedAt(new Date(System.currentTimeMillis() - 10000))
-                .setExpiration(new Date(System.currentTimeMillis() - 5000))
+        String expiredToken = Jwts.builder().subject("123").issuedAt(new Date(System.currentTimeMillis() - 10000)).expiration(new Date(System.currentTimeMillis() - 5000))
                 .signWith(key)
                 .compact();
 
